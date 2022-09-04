@@ -1,0 +1,83 @@
+diff --git a/Source/Core/Common/CommonPaths.h b/Source/Core/Common/CommonPaths.h
+index 7a67a7390..5b2213ee2 100644
+--- a/Source/Core/Common/CommonPaths.h
++++ b/Source/Core/Common/CommonPaths.h
+@@ -136,3 +136,4 @@
+ 
+ // Slippi
+ #define USER_JSON "user.json"
++#define RE_USER_JSON "re-user.json"
+diff --git a/Source/Core/Common/FileUtil.cpp b/Source/Core/Common/FileUtil.cpp
+index 879040937..347693d8c 100644
+--- a/Source/Core/Common/FileUtil.cpp
++++ b/Source/Core/Common/FileUtil.cpp
+@@ -810,9 +810,9 @@ std::string GetSysDirectory()
+ std::string GetSlippiUserJSONPath()
+ {
+ #if defined(__APPLE__)
+-	std::string userFilePath = File::GetApplicationSupportDirectory() + "/Slippi/user.json";
++	std::string userFilePath = File::GetApplicationSupportDirectory() + "/Slippi/re-user.json";
+ #else
+-	std::string userFilePath = File::GetUserPath(F_USERJSON_IDX);
++	std::string userFilePath = File::GetUserPath(F_RE_USERJSON_IDX);
+ #endif
+ 	return userFilePath;
+ }
+@@ -858,6 +858,7 @@ static void RebuildUserDirectories(unsigned int dir_index)
+ 		s_user_paths[F_GCSRAM_IDX] = s_user_paths[D_GCUSER_IDX] + GC_SRAM;
+ 		s_user_paths[F_WIISDCARD_IDX] = s_user_paths[D_WIIROOT_IDX] + DIR_SEP WII_SDCARD;
+ 		s_user_paths[F_USERJSON_IDX] = s_user_paths[D_SLIPPI_IDX] + USER_JSON;
++		s_user_paths[F_RE_USERJSON_IDX] = s_user_paths[D_SLIPPI_IDX] + RE_USER_JSON;
+ 
+ 		s_user_paths[D_MEMORYWATCHER_IDX] = s_user_paths[D_USER_IDX] + MEMORYWATCHER_DIR DIR_SEP;
+ 		s_user_paths[F_MEMORYWATCHERLOCATIONS_IDX] = s_user_paths[D_MEMORYWATCHER_IDX] + MEMORYWATCHER_LOCATIONS;
+diff --git a/Source/Core/Common/FileUtil.h b/Source/Core/Common/FileUtil.h
+index 960753e25..a5659369a 100644
+--- a/Source/Core/Common/FileUtil.h
++++ b/Source/Core/Common/FileUtil.h
+@@ -61,6 +61,7 @@ enum
+ 	F_MEMORYWATCHERSOCKET_IDX,
+ 	F_WIISDCARD_IDX,
+ 	F_USERJSON_IDX,
++	F_RE_USERJSON_IDX,
+ 	NUM_PATH_INDICES
+ };
+ 
+diff --git a/Source/Core/Core/Slippi/SlippiMatchmaking.cpp b/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
+index 4728bb2e9..832f14878 100644
+--- a/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
++++ b/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
+@@ -34,7 +34,7 @@ SlippiMatchmaking::SlippiMatchmaking(SlippiUser *user)
+ 	m_client = nullptr;
+ 	m_server = nullptr;
+ 
+-	MM_HOST = scm_slippi_semver_str.find("dev") == std::string::npos ? MM_HOST_PROD : MM_HOST_DEV;
++	MM_HOST = MM_HOST_LOCAL;
+ 
+ 	generator = std::default_random_engine(Common::Timer::GetTimeMs());
+ }
+diff --git a/Source/Core/Core/Slippi/SlippiMatchmaking.h b/Source/Core/Core/Slippi/SlippiMatchmaking.h
+index 957f43445..b872c2ba4 100644
+--- a/Source/Core/Core/Slippi/SlippiMatchmaking.h
++++ b/Source/Core/Core/Slippi/SlippiMatchmaking.h
+@@ -70,6 +70,7 @@ class SlippiMatchmaking
+   protected:
+ 	const std::string MM_HOST_DEV = "mm2.slippi.gg";
+ 	const std::string MM_HOST_PROD = "mm.slippi.gg";
++	const std::string MM_HOST_LOCAL = "localhost";
+ 	const u16 MM_PORT = 43113;
+ 
+ 	std::string MM_HOST = "";
+diff --git a/Source/Core/Core/Slippi/SlippiUser.h b/Source/Core/Core/Slippi/SlippiUser.h
+index b35411add..21b5f8008 100644
+--- a/Source/Core/Core/Slippi/SlippiUser.h
++++ b/Source/Core/Core/Slippi/SlippiUser.h
+@@ -44,7 +44,7 @@ class SlippiUser
+ 	UserInfo userInfo;
+ 	bool isLoggedIn = false;
+ 
+-	const std::string URL_START = "https://users-rest-dot-slippi.uc.r.appspot.com/user";
++	const std::string URL_START = "http://localhost:5000/user";
+ 	CURL *m_curl = nullptr;
+ 	struct curl_slist *m_curlHeaderList = nullptr;
+ 	std::vector<char> receiveBuf;
