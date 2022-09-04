@@ -2,6 +2,7 @@ use std::net::{IpAddr,Ipv4Addr};
 
 mod webserver;
 mod matchmaking;
+mod user;
 
 const MATCHMAKING_PORT: u16 = 43113;
 const WEBSERVER_PORT: u16 = 5000;

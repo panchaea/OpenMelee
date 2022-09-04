@@ -1,14 +1,8 @@
 use std::net::{IpAddr, SocketAddr};
 
-use serde_derive::{Deserialize, Serialize};
 use warp::Filter;
 
-#[derive(Deserialize, Serialize)]
-struct User {
-    display_name: String,
-    connect_code: String,
-    latest_version: String,
-}
+use crate::user::User;
 
 pub async fn start_server(host: IpAddr, port: u16) {
     let socket_address = SocketAddr::new(host, port);
