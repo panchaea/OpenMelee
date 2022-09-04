@@ -9,10 +9,10 @@ use enet::*;
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct User {
-    pub uid: String,
-    pub play_key: String,
-    pub display_name: String,
-    pub connect_code: String,
+    uid: String,
+    play_key: String,
+    display_name: String,
+    connect_code: String,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -27,7 +27,9 @@ struct Search {
 struct Player {
     is_local_player: bool,
     port: i64,
-    user: User,
+    uid: String,
+    display_name: String,
+    connect_code: String,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
@@ -217,4 +219,25 @@ fn can_parse_create_ticket_unranked_message() {
             assert_eq!(app_version, "2.5.1"),
         _ => assert_eq!(1, 2),
     }
+}
+
+#[test]
+fn can_create_get_ticket_response_message() {
+    let message = MatchmakingMessage::GetTicketResponse {
+        latest_version: String::from("2.5.1"),
+        match_id: String::from("1"),
+        is_host: false,
+        players: vec![
+            Player {
+                is_local_player: false,
+                uid: String::from("1"),
+                display_name: String::from("test"),
+                connect_code: String::from("TEST#001"),
+                port: 45000,
+            }
+        ],
+        stages: vec![
+            Stage::FountainOfDreams
+        ]
+    };
 }
