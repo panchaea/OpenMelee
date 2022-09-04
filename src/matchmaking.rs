@@ -2,6 +2,7 @@ use std::net::Ipv4Addr;
 use std::convert::TryFrom;
 
 use enet::*;
+use encoding_rs::SHIFT_JIS;
 
 #[derive(Debug, PartialEq)]
 enum MatchmakingMessageType {
@@ -82,10 +83,14 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
                 let play_mode = OnlinePlayMode::try_from(
                     parsed_json["search"]["mode"].as_i64().unwrap()
                 ).unwrap();
+                let player_tag_encoded: Vec<u8> = parsed_json["search"]["connectCode"].members().map(|value| {
+                    return value.as_u8().unwrap();
+                }).collect();
+                let (player_tag, _enc, errors) = SHIFT_JIS.decode(&player_tag_encoded);
 
                 match message_type {
                     Ok(MatchmakingMessageType::CreateTicket) => {
-                        println!("create-ticket for {:?}", play_mode);
+                        println!("create-ticket for {:?} {}", play_mode, player_tag);
                         sender.send_packet(
                             Packet::new(
                                 &json::stringify(json::object!{"type": "create-ticket-resp"}).into_bytes(),
