@@ -26,7 +26,7 @@ struct Search {
 #[serde(rename_all = "camelCase")]
 struct Player {
     is_local_player: bool,
-    port: i64,
+    port: u16,
     uid: String,
     display_name: String,
     connect_code: String,
