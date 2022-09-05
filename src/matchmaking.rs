@@ -1,10 +1,10 @@
 use std::net::Ipv4Addr;
 use std::convert::TryFrom;
 
-use serde_derive::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 use encoding_rs::SHIFT_JIS;
 use enet::*;
+use serde::{de, Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
