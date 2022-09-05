@@ -27,6 +27,7 @@
             pkgs.nixfmt
             pkgs.rust-analyzer
             pkgs.rustc
+            pkgs.rustfmt
             (ssbmPkgs.slippi-netplay.overrideAttrs (oldAttrs: rec {
               # TODO: remove version and src after
               # https://github.com/djanatyn/ssbm-nix/pull/27 is merged
