@@ -1,12 +1,17 @@
+use std::collections::HashSet;
 use std::net::Ipv4Addr;
 
 use encoding_rs::SHIFT_JIS;
 use enet::*;
+use itertools::Itertools;
 use serde::{de, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use unicode_normalization::UnicodeNormalization;
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+const LATEST_SLIPPI_CLIENT_VERSION: &str = "2.5.1";
+const ENET_CHANNEL_ID: u8 = 0;
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct User {
     uid: String,
@@ -15,7 +20,7 @@ struct User {
     connect_code: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Search {
     #[serde(default)]
@@ -36,10 +41,12 @@ where
     Ok(Some(connect_code.to_string().nfkc().collect::<String>()))
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Player {
     is_local_player: bool,
+    ip_address: String,
+    ip_address_lan: String,
     port: u16,
     uid: String,
     display_name: String,
@@ -66,16 +73,18 @@ enum Stage {
     FinalDestination = 0x20,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename = "create-ticket", rename_all = "camelCase")]
+struct CreateTicket {
+    app_version: String,
+    ip_address_lan: String,
+    search: Search,
+    user: User,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "type")]
 enum MatchmakingMessage {
-    #[serde(rename = "create-ticket", rename_all = "camelCase")]
-    CreateTicket {
-        app_version: String,
-        ip_address_lan: String,
-        search: Search,
-        user: User,
-    },
     #[serde(rename = "create-ticket-resp")]
     CreateTicketResponse {},
     #[serde(rename = "get-ticket-resp")]
@@ -92,7 +101,7 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
     let enet = Enet::new().expect("Could not initialize ENet");
     let listen_address = Address::new(host, port);
     let mut host = enet
-        .create_host::<()>(
+        .create_host::<CreateTicket>(
             Some(&listen_address),
             10,
             ChannelLimit::Maximum,
@@ -103,34 +112,21 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
 
     loop {
         match host.service(1000).expect("ENet service failed") {
-            Some(Event::Connect(_)) => println!("new connection!"),
-            Some(Event::Disconnect(..)) => println!("disconnect!"),
+            Some(Event::Connect(_)) => println!("New connection!"),
+            Some(Event::Disconnect(..)) => println!("Disconnect!"),
             Some(Event::Receive {
-                channel_id,
                 ref packet,
                 ref mut sender,
+                ..
             }) => {
                 let packet_data = std::str::from_utf8(packet.data()).unwrap();
+                let message: CreateTicket = serde_json::from_str(packet_data).unwrap();
 
-                println!(
-                    "got packet on channel {}, content: '{}'",
-                    channel_id, packet_data,
-                );
+                println!("{:?}", packet_data);
 
-                let message: MatchmakingMessage = serde_json::from_str(packet_data).unwrap();
-
-                match message {
-                    MatchmakingMessage::CreateTicket { search, .. } => {
-                        match search.mode {
-                            OnlinePlayMode::Direct => {
-                                let connect_code = search.connect_code.unwrap();
-                                println!("create-ticket for {:?} {}", search.mode, connect_code);
-                            }
-                            _ => {
-                                println!("create-ticket for {:?}", search.mode);
-                            }
-                        }
-
+                match message.search.mode {
+                    OnlinePlayMode::Direct => {
+                        sender.set_data(Some(message.clone()));
                         sender
                             .send_packet(
                                 Packet::new(
@@ -142,24 +138,146 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
                                     PacketMode::ReliableSequenced,
                                 )
                                 .unwrap(),
-                                channel_id,
+                                ENET_CHANNEL_ID,
                             )
-                            .unwrap()
+                            .unwrap();
                     }
-                    MatchmakingMessage::CreateTicketResponse { .. } => {
-                        println!("create-ticket-resp")
+                    _ => {
+                        println!("Play mode {:?} not implemented", message.search.mode);
+                        sender.disconnect_later(0);
                     }
-                    MatchmakingMessage::GetTicketResponse { .. } => println!("get-ticket-resp"),
                 }
             }
             _ => (),
         }
+
+        host.peers()
+            .collect_vec()
+            .clone()
+            .into_iter()
+            .filter(|peer| peer.state() == PeerState::Connected)
+            .filter(|peer| match peer.data() {
+                Some(CreateTicket { search, .. }) => search.mode == OnlinePlayMode::Direct,
+                _ => false,
+            })
+            .group_by(|peer| {
+                let CreateTicket { user, search, .. } = peer.data().unwrap();
+                vec![
+                    user.connect_code.clone(),
+                    search.connect_code.clone().unwrap(),
+                ]
+                .into_iter()
+                .collect::<HashSet<_>>();
+            })
+            .into_iter()
+            .filter_map(|(_, all_peers)| {
+                let vec = all_peers.collect_vec().clone();
+                match vec.len() {
+                    2 => Some(vec),
+                    _ => None,
+                }
+            })
+            .for_each(|all_peers| {
+                for (mut first, mut second) in all_peers.clone().into_iter().tuples() {
+                    let (first_message, second_message) =
+                        create_game(first.clone(), second.clone(), vec![Stage::FinalDestination]);
+
+                    first
+                        .send_packet(
+                            Packet::new(
+                                &serde_json::to_string(&first_message).unwrap().into_bytes(),
+                                PacketMode::ReliableSequenced,
+                            )
+                            .unwrap(),
+                            ENET_CHANNEL_ID,
+                        )
+                        .unwrap();
+                    first.set_data(None);
+
+                    second
+                        .send_packet(
+                            Packet::new(
+                                &serde_json::to_string(&second_message).unwrap().into_bytes(),
+                                PacketMode::ReliableSequenced,
+                            )
+                            .unwrap(),
+                            ENET_CHANNEL_ID,
+                        )
+                        .unwrap();
+                    second.set_data(None);
+                }
+            });
     }
+}
+
+fn create_game(
+    first: Peer<CreateTicket>,
+    second: Peer<CreateTicket>,
+    stages: Vec<Stage>,
+) -> (MatchmakingMessage, MatchmakingMessage) {
+    let CreateTicket {
+        user: first_user,
+        ip_address_lan: first_ip_address_lan,
+        ..
+    } = first.data().unwrap();
+
+    let CreateTicket {
+        user: second_user,
+        ip_address_lan: second_ip_address_lan,
+        ..
+    } = second.data().unwrap();
+
+    let first_message = MatchmakingMessage::GetTicketResponse {
+        latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
+        match_id: "123456789".to_string(),
+        is_host: false,
+        players: vec![Player {
+            is_local_player: false,
+            uid: second_user.uid.to_string(),
+            display_name: second_user.display_name.to_string(),
+            connect_code: second_user.connect_code.to_string(),
+            ip_address: format!(
+                "{}:{}",
+                second.address().ip().to_string(),
+                second.address().port().to_string()
+            ),
+            ip_address_lan: second_ip_address_lan.to_string(),
+            port: second.address().port(),
+        }],
+        stages: vec![Stage::FinalDestination],
+    };
+
+    let second_message = MatchmakingMessage::GetTicketResponse {
+        latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
+        match_id: "123456789".to_string(),
+        is_host: false,
+        players: vec![Player {
+            is_local_player: false,
+            uid: first_user.uid.to_string(),
+            display_name: first_user.display_name.to_string(),
+            connect_code: first_user.connect_code.to_string(),
+            ip_address: format!(
+                "{}:{}",
+                first.address().ip().to_string(),
+                first.address().port().to_string()
+            ),
+            ip_address_lan: first_ip_address_lan.to_string(),
+            port: first.address().port(),
+        }],
+        stages: vec![Stage::FinalDestination],
+    };
+
+    (first_message, second_message)
 }
 
 #[test]
 fn can_parse_create_ticket_direct_message() {
-    let message: MatchmakingMessage = serde_json::from_str(r#"
+    let CreateTicket {
+        app_version,
+        search,
+        ..
+    } = serde_json::from_str(
+        r#"
         {
             "type": "create-ticket",
             "appVersion": "2.5.1",
@@ -175,24 +293,17 @@ fn can_parse_create_ticket_direct_message() {
                 "uid": "1"
             }
         }
-    "#).unwrap();
+    "#,
+    )
+    .unwrap();
 
-    match message {
-        MatchmakingMessage::CreateTicket {
-            app_version,
-            search,
-            ..
-        } => {
-            assert_eq!(app_version, "2.5.1");
-            assert_eq!(search.connect_code.unwrap(), String::from("TEST#001"));
-        }
-        _ => assert_eq!(1, 2),
-    }
+    assert_eq!(app_version, "2.5.1");
+    assert_eq!(search.connect_code.as_ref().unwrap(), "TEST#001");
 }
 
 #[test]
 fn can_parse_create_ticket_unranked_message() {
-    let message: MatchmakingMessage = serde_json::from_str(
+    let CreateTicket { app_version, .. } = serde_json::from_str(
         r#"
         {
             "type": "create-ticket",
@@ -212,16 +323,13 @@ fn can_parse_create_ticket_unranked_message() {
     )
     .unwrap();
 
-    match message {
-        MatchmakingMessage::CreateTicket { app_version, .. } => assert_eq!(app_version, "2.5.1"),
-        _ => assert_eq!(1, 2),
-    }
+    assert_eq!(app_version, "2.5.1");
 }
 
 #[test]
 fn can_create_get_ticket_response_message() {
-    let message = MatchmakingMessage::GetTicketResponse {
-        latest_version: String::from("2.5.1"),
+    let _message = MatchmakingMessage::GetTicketResponse {
+        latest_version: String::from(LATEST_SLIPPI_CLIENT_VERSION),
         match_id: String::from("1"),
         is_host: false,
         players: vec![Player {
@@ -229,6 +337,8 @@ fn can_create_get_ticket_response_message() {
             uid: String::from("1"),
             display_name: String::from("test"),
             connect_code: String::from("TEST#001"),
+            ip_address: String::from("127.0.0.1:48593"),
+            ip_address_lan: String::from("127.0.0.1:48593"),
             port: 45000,
         }],
         stages: vec![Stage::FountainOfDreams],
