@@ -21,7 +21,7 @@
           src = ./.;
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           nativeBuildInputs = [ pkgs.clang pkgs.cmake ];
-          buildInputs = [ pkgs.enet ];
+          buildInputs = [ pkgs.enet pkgs.sqlite ];
           dontUseCmakeConfigure = true;
         };
 
@@ -36,6 +36,7 @@
           buildInputs = crateBuildAttrs.buildInputs ++ [
             pkgs.cargo
             pkgs.clippy
+            pkgs.diesel-cli
             pkgs.nixfmt
             pkgs.rust-analyzer
             pkgs.rustc

@@ -8,7 +8,8 @@ use serde::{de, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use unicode_normalization::UnicodeNormalization;
 
-const LATEST_SLIPPI_CLIENT_VERSION: &str = "2.5.1";
+use slippi_re::LATEST_SLIPPI_CLIENT_VERSION;
+
 const ENET_CHANNEL_ID: u8 = 0;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
