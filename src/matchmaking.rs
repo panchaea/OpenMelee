@@ -4,6 +4,7 @@ use encoding_rs::SHIFT_JIS;
 use enet::*;
 use serde::{de, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use unicode_normalization::UnicodeNormalization;
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,8 +18,22 @@ struct User {
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Search {
-    connect_code: Option<Vec<u8>>,
-    mode: OnlinePlayMode
+    #[serde(default)]
+    #[serde(
+        deserialize_with = "shift_jis_code_point_array_to_string",
+        rename = "connectCode"
+    )]
+    connect_code: Option<String>,
+    mode: OnlinePlayMode,
+}
+
+fn shift_jis_code_point_array_to_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    let v: Vec<u8> = Deserialize::deserialize(deserializer)?;
+    let (connect_code, _enc, _errors) = SHIFT_JIS.decode(&v);
+    Ok(Some(connect_code.to_string().nfkc().collect::<String>()))
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -112,8 +127,7 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
                     } => {
                         match search.mode {
                             OnlinePlayMode::Direct => {
-                                let connect_code_enc = search.connect_code.unwrap();
-                                let (connect_code, _enc, _errors) = SHIFT_JIS.decode(&connect_code_enc);
+                                let connect_code = search.connect_code.unwrap();
                                 println!("create-ticket for {:?} {}", search.mode, connect_code);
                             }
                             _ => {
@@ -146,7 +160,7 @@ fn can_parse_create_ticket_direct_message() {
             "appVersion": "2.5.1",
             "ipAddressLan": "127.0.0.2:50285",
             "search": {
-                "connectCode": [130,120,130,116,130,108,130,104,129,148,130,84,130,84,130,87],
+                "connectCode": [130, 115, 130, 100, 130, 114, 130, 115, 129, 148, 130, 79, 130, 79, 130, 80],
                 "mode": 2
             },
             "user": {
@@ -159,8 +173,14 @@ fn can_parse_create_ticket_direct_message() {
     "#).unwrap();
 
     match message {
-        MatchmakingMessage::CreateTicket{app_version, ..} =>
-            assert_eq!(app_version, "2.5.1"),
+        MatchmakingMessage::CreateTicket {
+            app_version,
+            search,
+            ..
+        } => {
+            assert_eq!(app_version, "2.5.1");
+            assert_eq!(search.connect_code.unwrap(), String::from("TEST#001"));
+        }
         _ => assert_eq!(1, 2),
     }
 }
