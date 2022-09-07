@@ -114,17 +114,13 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
 
                 println!(
                     "got packet on channel {}, content: '{}'",
-                    channel_id,
-                    packet_data,
+                    channel_id, packet_data,
                 );
 
                 let message: MatchmakingMessage = serde_json::from_str(packet_data).unwrap();
 
                 match message {
-                    MatchmakingMessage::CreateTicket{
-                        search,
-                        ..
-                    } => {
+                    MatchmakingMessage::CreateTicket { search, .. } => {
                         match search.mode {
                             OnlinePlayMode::Direct => {
                                 let connect_code = search.connect_code.unwrap();
@@ -135,18 +131,27 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
                             }
                         }
 
-                        sender.send_packet(
-                            Packet::new(
-                                &serde_json::to_string(&MatchmakingMessage::CreateTicketResponse {}).unwrap().into_bytes(),
-                                PacketMode::ReliableSequenced
-                            ).unwrap(),
-                            channel_id,
-                        ).unwrap()
-                    },
-                    MatchmakingMessage::CreateTicketResponse {..} => println!("create-ticket-resp"),
-                    MatchmakingMessage::GetTicketResponse {..} => println!("get-ticket-resp"),
+                        sender
+                            .send_packet(
+                                Packet::new(
+                                    &serde_json::to_string(
+                                        &MatchmakingMessage::CreateTicketResponse {},
+                                    )
+                                    .unwrap()
+                                    .into_bytes(),
+                                    PacketMode::ReliableSequenced,
+                                )
+                                .unwrap(),
+                                channel_id,
+                            )
+                            .unwrap()
+                    }
+                    MatchmakingMessage::CreateTicketResponse { .. } => {
+                        println!("create-ticket-resp")
+                    }
+                    MatchmakingMessage::GetTicketResponse { .. } => println!("get-ticket-resp"),
                 }
-            },
+            }
             _ => (),
         }
     }
@@ -187,7 +192,8 @@ fn can_parse_create_ticket_direct_message() {
 
 #[test]
 fn can_parse_create_ticket_unranked_message() {
-    let message: MatchmakingMessage = serde_json::from_str(r#"
+    let message: MatchmakingMessage = serde_json::from_str(
+        r#"
         {
             "type": "create-ticket",
             "appVersion": "2.5.1",
@@ -202,11 +208,12 @@ fn can_parse_create_ticket_unranked_message() {
                 "uid": "1"
             }
         }
-    "#).unwrap();
+    "#,
+    )
+    .unwrap();
 
     match message {
-        MatchmakingMessage::CreateTicket{app_version, ..} =>
-            assert_eq!(app_version, "2.5.1"),
+        MatchmakingMessage::CreateTicket { app_version, .. } => assert_eq!(app_version, "2.5.1"),
         _ => assert_eq!(1, 2),
     }
 }
@@ -217,17 +224,13 @@ fn can_create_get_ticket_response_message() {
         latest_version: String::from("2.5.1"),
         match_id: String::from("1"),
         is_host: false,
-        players: vec![
-            Player {
-                is_local_player: false,
-                uid: String::from("1"),
-                display_name: String::from("test"),
-                connect_code: String::from("TEST#001"),
-                port: 45000,
-            }
-        ],
-        stages: vec![
-            Stage::FountainOfDreams
-        ]
+        players: vec![Player {
+            is_local_player: false,
+            uid: String::from("1"),
+            display_name: String::from("test"),
+            connect_code: String::from("TEST#001"),
+            port: 45000,
+        }],
+        stages: vec![Stage::FountainOfDreams],
     };
 }
