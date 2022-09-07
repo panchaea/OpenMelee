@@ -40,7 +40,8 @@ enum OnlinePlayMode {
     Teams = 3,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
+#[repr(u8)]
 enum Stage {
     FountainOfDreams = 0x2,
     PokemonStadium = 0x3,
