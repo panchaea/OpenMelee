@@ -15,15 +15,27 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         ssbmPkgs = ssbm-nix.packages.${system};
+        craneLib = crane.lib.${system};
 
-        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-        nativeBuildInputs = [ pkgs.clang pkgs.cmake ];
-        buildInputs = [ pkgs.enet ];
+        _crateBuildAttrs = {
+          src = ./.;
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+          nativeBuildInputs = [ pkgs.clang pkgs.cmake ];
+          buildInputs = [ pkgs.enet ];
+          dontUseCmakeConfigure = true;
+        };
+
+        cargoArtifacts = craneLib.buildDepsOnly _crateBuildAttrs;
+
+        crateBuildAttrs = _crateBuildAttrs // { inherit cargoArtifacts; };
+
+        crate = craneLib.buildPackage crateBuildAttrs;
       in {
         devShells.default = pkgs.mkShell {
-          inherit LIBCLANG_PATH;
-          buildInputs = nativeBuildInputs ++ buildInputs ++ [
+          inherit (crateBuildAttrs) LIBCLANG_PATH nativeBuildInputs;
+          buildInputs = crateBuildAttrs.buildInputs ++ [
             pkgs.cargo
+            pkgs.clippy
             pkgs.nixfmt
             pkgs.rust-analyzer
             pkgs.rustc
@@ -43,10 +55,14 @@
           ];
         };
 
-        packages.default = crane.lib.${system}.buildPackage {
-          inherit LIBCLANG_PATH nativeBuildInputs buildInputs;
-          src = ./.;
-          dontUseCmakeConfigure = true;
+        packages.default = crate;
+
+        apps.default = flake-utils.lib.mkApp { drv = crate; };
+
+        checks = {
+          inherit crate;
+          clippy = craneLib.cargoClippy crateBuildAttrs;
+          formatting = craneLib.cargoFmt crateBuildAttrs;
         };
       });
 }
