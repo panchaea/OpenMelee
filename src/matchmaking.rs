@@ -1,5 +1,4 @@
 use std::net::Ipv4Addr;
-use std::convert::TryFrom;
 
 use encoding_rs::SHIFT_JIS;
 use enet::*;
@@ -41,20 +40,6 @@ enum OnlinePlayMode {
     Teams = 3,
 }
 
-impl TryFrom<i64> for OnlinePlayMode {
-    type Error = ();
-
-    fn try_from(value: i64) -> Result<OnlinePlayMode, Self::Error> {
-        match value {
-            0 => Ok(OnlinePlayMode::Ranked),
-            1 => Ok(OnlinePlayMode::Unranked),
-            2 => Ok(OnlinePlayMode::Direct),
-            3 => Ok(OnlinePlayMode::Teams),
-            _ => Err(()),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Copy, Clone, Deserialize, Serialize)]
 enum Stage {
     FountainOfDreams = 0x2,
@@ -63,22 +48,6 @@ enum Stage {
     DreamLand = 0x1C,
     Battlefield = 0x1F,
     FinalDestination = 0x20,
-}
-
-impl TryFrom<i64> for Stage {
-    type Error = ();
-
-    fn try_from(value: i64) -> Result<Stage, Self::Error> {
-        match value {
-            0x2 => Ok(Stage::FountainOfDreams),
-            0x3 => Ok(Stage::PokemonStadium),
-            0x8 => Ok(Stage::YoshisStory),
-            0x1C => Ok(Stage::DreamLand),
-            0x1F => Ok(Stage::Battlefield),
-            0x20 => Ok(Stage::FinalDestination),
-            _ => Err(())
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
