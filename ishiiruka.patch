@@ -43,8 +43,43 @@ index 960753e25..a5659369a 100644
  	NUM_PATH_INDICES
  };
  
+diff --git a/Source/Core/Core/ConfigManager.cpp b/Source/Core/Core/ConfigManager.cpp
+index e6c01cf57..6fc5f07a6 100644
+--- a/Source/Core/Core/ConfigManager.cpp
++++ b/Source/Core/Core/ConfigManager.cpp
+@@ -290,6 +290,8 @@ void SConfig::SaveCoreSettings(IniFile &ini)
+ 	core->Set("SlippiLanIp", m_slippiLanIp);
+ 	core->Set("SlippiReplayMonthFolders", m_slippiReplayMonthFolders);
+ 	core->Set("SlippiReplayDir", m_strSlippiReplayDir);
++	core->Set("SlippiMatchmakingHost", m_slippiMatchmakingHost);
++	core->Set("SlippiUserDiscoveryUrl", m_slippiUserDiscoveryUrl);
+ 	core->Set("SlippiPlaybackDisplayFrameIndex", m_slippiEnableFrameIndex);
+ 	core->Set("BlockingPipes", m_blockingPipes);
+ 	core->Set("MemcardAPath", m_strMemoryCardA);
+@@ -632,6 +634,8 @@ void SConfig::LoadCoreSettings(IniFile &ini)
+ 	core->Get("SlippiReplayMonthFolders", &m_slippiReplayMonthFolders, false);
+ 	std::string default_replay_dir = File::GetHomeDirectory() + DIR_SEP + "Slippi";
+ 	core->Get("SlippiReplayDir", &m_strSlippiReplayDir, default_replay_dir);
++	core->Set("SlippiMatchmakingHost", "mm.slippi.gg");
++	core->Set("SlippiUserDiscoveryUrl", "https://users-rest-dot-slippi.uc.r.appspot.com/user");
+ 	if (m_strSlippiReplayDir.empty())
+ 		m_strSlippiReplayDir = default_replay_dir;
+ 	core->Get("SlippiPlaybackDisplayFrameIndex", &m_slippiEnableFrameIndex, false);
+diff --git a/Source/Core/Core/ConfigManager.h b/Source/Core/Core/ConfigManager.h
+index 80a078972..43bb58a08 100644
+--- a/Source/Core/Core/ConfigManager.h
++++ b/Source/Core/Core/ConfigManager.h
+@@ -160,6 +160,8 @@ struct SConfig : NonCopyable
+ 	int m_slippiEnableQuickChat = SLIPPI_CHAT_ON;
+ 	bool m_slippiReplayMonthFolders = false;
+ 	std::string m_strSlippiReplayDir;
++	std::string m_slippiMatchmakingHost = "mm.slippi.gg";
++	std::string m_slippiUserDiscoveryUrl = "https://users-rest-dot-slippi.uc.r.appspot.com/user";
+ 	bool m_slippiForceNetplayPort = false;
+ 	int m_slippiNetplayPort;
+ 	bool m_slippiForceLanIp = false;
 diff --git a/Source/Core/Core/Slippi/SlippiMatchmaking.cpp b/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
-index 4728bb2e9..832f14878 100644
+index 4728bb2e9..aaf060f43 100644
 --- a/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
 +++ b/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
 @@ -34,7 +34,7 @@ SlippiMatchmaking::SlippiMatchmaking(SlippiUser *user)
@@ -52,32 +87,137 @@ index 4728bb2e9..832f14878 100644
  	m_server = nullptr;
  
 -	MM_HOST = scm_slippi_semver_str.find("dev") == std::string::npos ? MM_HOST_PROD : MM_HOST_DEV;
-+	MM_HOST = MM_HOST_LOCAL;
++	MM_HOST = SConfig::GetInstance().m_slippiMatchmakingHost;
  
  	generator = std::default_random_engine(Common::Timer::GetTimeMs());
  }
 diff --git a/Source/Core/Core/Slippi/SlippiMatchmaking.h b/Source/Core/Core/Slippi/SlippiMatchmaking.h
-index 957f43445..b872c2ba4 100644
+index 957f43445..15cbf782d 100644
 --- a/Source/Core/Core/Slippi/SlippiMatchmaking.h
 +++ b/Source/Core/Core/Slippi/SlippiMatchmaking.h
-@@ -70,6 +70,7 @@ class SlippiMatchmaking
+@@ -68,8 +68,6 @@ class SlippiMatchmaking
+ 	static bool IsFixedRulesMode(OnlinePlayMode mode);
+ 
    protected:
- 	const std::string MM_HOST_DEV = "mm2.slippi.gg";
- 	const std::string MM_HOST_PROD = "mm.slippi.gg";
-+	const std::string MM_HOST_LOCAL = "localhost";
+-	const std::string MM_HOST_DEV = "mm2.slippi.gg";
+-	const std::string MM_HOST_PROD = "mm.slippi.gg";
  	const u16 MM_PORT = 43113;
  
  	std::string MM_HOST = "";
+diff --git a/Source/Core/Core/Slippi/SlippiUser.cpp b/Source/Core/Core/Slippi/SlippiUser.cpp
+index c6e7da768..64382e669 100644
+--- a/Source/Core/Core/Slippi/SlippiUser.cpp
++++ b/Source/Core/Core/Slippi/SlippiUser.cpp
+@@ -290,7 +290,7 @@ void SlippiUser::overwriteFromServer()
+ 		return;
+ 
+ 	// Generate URL. If this is a beta version, use the beta endpoint
+-	std::string url = URL_START;
++	std::string url = SConfig::GetInstance().m_slippiUserDiscoveryUrl;
+ 	if (scm_slippi_semver_str.find("beta") != std::string::npos)
+ 	{
+ 		url = url + "-beta";
 diff --git a/Source/Core/Core/Slippi/SlippiUser.h b/Source/Core/Core/Slippi/SlippiUser.h
-index b35411add..21b5f8008 100644
+index b35411add..7f8159f0b 100644
 --- a/Source/Core/Core/Slippi/SlippiUser.h
 +++ b/Source/Core/Core/Slippi/SlippiUser.h
-@@ -44,7 +44,7 @@ class SlippiUser
+@@ -44,7 +44,6 @@ class SlippiUser
  	UserInfo userInfo;
  	bool isLoggedIn = false;
  
 -	const std::string URL_START = "https://users-rest-dot-slippi.uc.r.appspot.com/user";
-+	const std::string URL_START = "http://localhost:5000/user";
  	CURL *m_curl = nullptr;
  	struct curl_slist *m_curlHeaderList = nullptr;
  	std::vector<char> receiveBuf;
+diff --git a/Source/Core/DolphinWX/Config/SlippiConfigPane.cpp b/Source/Core/DolphinWX/Config/SlippiConfigPane.cpp
+index b6136ce15..c42cd0523 100644
+--- a/Source/Core/DolphinWX/Config/SlippiConfigPane.cpp
++++ b/Source/Core/DolphinWX/Config/SlippiConfigPane.cpp
+@@ -91,6 +91,14 @@ void SlippiNetplayConfigPane::InitializeGUI()
+ 	ipTextValidator.SetIncludes(charsToFilter);
+ 	m_slippi_netplay_lan_ip_ctrl->SetValidator(ipTextValidator);
+ 
++	m_slippi_matchmaking_host_txt = new wxStaticText(this, wxID_ANY, _("Matchmaking host:"));
++	m_slippi_matchmaking_host_ctrl = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(120, -1));
++	m_slippi_matchmaking_host_ctrl->SetMaxLength(200);
++
++	m_slippi_user_discovery_url_txt = new wxStaticText(this, wxID_ANY, _("User discovery URL:"));
++	m_slippi_user_discovery_url_ctrl = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(120, -1));
++	m_slippi_user_discovery_url_ctrl->SetMaxLength(200);
++
+ 	// Input settings
+ 	m_reduce_timing_dispersion_checkbox = new wxCheckBox(this, wxID_ANY, _("Reduce Timing Dispersion"));
+ 	m_reduce_timing_dispersion_checkbox->SetToolTip(
+@@ -131,6 +139,12 @@ void SlippiNetplayConfigPane::InitializeGUI()
+ 	                           wxALIGN_CENTER_VERTICAL);
+ 	sSlippiOnlineSettings->Add(m_slippi_netplay_lan_ip_ctrl, wxGBPosition(3, 1), wxDefaultSpan,
+ 	                           wxALIGN_LEFT | wxRESERVE_SPACE_EVEN_IF_HIDDEN);
++	sSlippiOnlineSettings->Add(m_slippi_matchmaking_host_txt, wxGBPosition(4, 0), wxDefaultSpan,
++							   wxALIGN_LEFT | wxRESERVE_SPACE_EVEN_IF_HIDDEN);
++	sSlippiOnlineSettings->Add(m_slippi_matchmaking_host_ctrl, wxGBPosition(4, 1), wxDefaultSpan, wxEXPAND);
++	sSlippiOnlineSettings->Add(m_slippi_user_discovery_url_txt, wxGBPosition(5, 0), wxDefaultSpan,
++							   wxALIGN_LEFT | wxRESERVE_SPACE_EVEN_IF_HIDDEN);
++	sSlippiOnlineSettings->Add(m_slippi_user_discovery_url_ctrl, wxGBPosition(5, 1), wxDefaultSpan, wxEXPAND);
+ 
+ 	wxStaticBoxSizer *const sbSlippiOnlineSettings =
+ 	    new wxStaticBoxSizer(wxVERTICAL, this, _("Slippi Online Settings"));
+@@ -193,6 +207,9 @@ void SlippiNetplayConfigPane::LoadGUIValues()
+ 		m_slippi_netplay_lan_ip_ctrl->Hide();
+ 	}
+ 
++	m_slippi_matchmaking_host_ctrl->SetValue(startup_params.m_slippiMatchmakingHost);
++	m_slippi_user_discovery_url_ctrl->SetValue(startup_params.m_slippiUserDiscoveryUrl);
++
+ 	m_reduce_timing_dispersion_checkbox->SetValue(startup_params.bReduceTimingDispersion);
+ }
+ 
+@@ -213,6 +230,8 @@ void SlippiNetplayConfigPane::BindEvents()
+ 	m_slippi_force_netplay_lan_ip_checkbox->Bind(wxEVT_CHECKBOX, &SlippiNetplayConfigPane::OnForceNetplayLanIpToggle,
+ 	                                             this);
+ 	m_slippi_netplay_lan_ip_ctrl->Bind(wxEVT_TEXT, &SlippiNetplayConfigPane::OnNetplayLanIpChanged, this);
++	m_slippi_matchmaking_host_ctrl->Bind(wxEVT_TEXT, &SlippiNetplayConfigPane::OnMatchmakingHostChanged, this);
++	m_slippi_user_discovery_url_ctrl->Bind(wxEVT_TEXT, &SlippiNetplayConfigPane::OnUserDiscoveryUrlChanged, this);
+ 
+ 	m_reduce_timing_dispersion_checkbox->Bind(wxEVT_CHECKBOX, &SlippiNetplayConfigPane::OnReduceTimingDispersionToggle,
+ 	                                          this);
+@@ -295,6 +314,16 @@ void SlippiNetplayConfigPane::OnNetplayLanIpChanged(wxCommandEvent &event)
+ 	SConfig::GetInstance().m_slippiLanIp = m_slippi_netplay_lan_ip_ctrl->GetValue().c_str();
+ }
+ 
++void SlippiNetplayConfigPane::OnMatchmakingHostChanged(wxCommandEvent &event)
++{
++	SConfig::GetInstance().m_slippiMatchmakingHost = m_slippi_matchmaking_host_ctrl->GetValue().c_str();
++}
++
++void SlippiNetplayConfigPane::OnUserDiscoveryUrlChanged(wxCommandEvent &event)
++{
++	SConfig::GetInstance().m_slippiUserDiscoveryUrl = m_slippi_user_discovery_url_ctrl->GetValue().c_str();
++}
++
+ void SlippiNetplayConfigPane::OnReduceTimingDispersionToggle(wxCommandEvent &event)
+ {
+ 	SConfig::GetInstance().bReduceTimingDispersion = m_reduce_timing_dispersion_checkbox->GetValue();
+diff --git a/Source/Core/DolphinWX/Config/SlippiConfigPane.h b/Source/Core/DolphinWX/Config/SlippiConfigPane.h
+index 3d4d46331..bde9003f8 100644
+--- a/Source/Core/DolphinWX/Config/SlippiConfigPane.h
++++ b/Source/Core/DolphinWX/Config/SlippiConfigPane.h
+@@ -37,6 +37,8 @@ class SlippiNetplayConfigPane final : public wxPanel
+ 	void OnNetplayPortChanged(wxCommandEvent &event);
+ 	void OnForceNetplayLanIpToggle(wxCommandEvent &event);
+ 	void OnNetplayLanIpChanged(wxCommandEvent &event);
++	void OnMatchmakingHostChanged(wxCommandEvent &event);
++	void OnUserDiscoveryUrlChanged(wxCommandEvent &event);
+ 	void OnQuickChatChanged(wxCommandEvent &event);
+ 	void OnReduceTimingDispersionToggle(wxCommandEvent &event);
+ 	void PopulateEnableChatChoiceBox();
+@@ -52,6 +54,10 @@ class SlippiNetplayConfigPane final : public wxPanel
+ 	wxSpinCtrl *m_slippi_force_netplay_port_ctrl;
+ 	wxCheckBox *m_slippi_force_netplay_lan_ip_checkbox;
+ 	wxTextCtrl *m_slippi_netplay_lan_ip_ctrl;
++	wxStaticText *m_slippi_matchmaking_host_txt;
++	wxTextCtrl *m_slippi_matchmaking_host_ctrl;
++	wxStaticText *m_slippi_user_discovery_url_txt;
++	wxTextCtrl *m_slippi_user_discovery_url_ctrl;
+ 	wxStaticText *m_slippi_enable_quick_chat_txt;
+ 	wxChoice *m_slippi_enable_quick_chat_choice;
+ 
