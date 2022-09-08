@@ -48,10 +48,19 @@ struct Player {
     is_local_player: bool,
     ip_address: String,
     ip_address_lan: String,
-    port: u16,
+    port: ControllerPort,
     uid: String,
     display_name: String,
     connect_code: String,
+}
+
+#[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
+#[repr(u8)]
+enum ControllerPort {
+    One = 1,
+    Two = 2,
+    Three = 3,
+    Four = 4,
 }
 
 #[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
@@ -243,7 +252,7 @@ fn create_game(
                 second.address().port().to_string()
             ),
             ip_address_lan: second_ip_address_lan.to_string(),
-            port: second.address().port(),
+            port: ControllerPort::Two,
         }],
         stages: vec![Stage::FinalDestination],
     };
@@ -263,7 +272,7 @@ fn create_game(
                 first.address().port().to_string()
             ),
             ip_address_lan: first_ip_address_lan.to_string(),
-            port: first.address().port(),
+            port: ControllerPort::One,
         }],
         stages: vec![Stage::FinalDestination],
     };
@@ -340,7 +349,7 @@ fn can_create_get_ticket_response_message() {
             connect_code: String::from("TEST#001"),
             ip_address: String::from("127.0.0.1:48593"),
             ip_address_lan: String::from("127.0.0.1:48593"),
-            port: 45000,
+            port: ControllerPort::One,
         }],
         stages: vec![Stage::FountainOfDreams],
     };
