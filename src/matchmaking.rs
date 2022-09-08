@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt;
 use std::net::Ipv4Addr;
 
 use encoding_rs::SHIFT_JIS;
@@ -71,6 +72,18 @@ enum OnlinePlayMode {
     Unranked = 1,
     Direct = 2,
     Teams = 3,
+}
+
+impl fmt::Display for OnlinePlayMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let string = match &self {
+            OnlinePlayMode::Ranked => "ranked",
+            OnlinePlayMode::Unranked => "unranked",
+            OnlinePlayMode::Direct => "direct",
+            OnlinePlayMode::Teams => "teams",
+        };
+        write!(f, "{}", string)
+    }
 }
 
 #[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
