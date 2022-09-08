@@ -20,6 +20,10 @@ async fn main() {
 
     println!("Started matchmaking server");
 
-    webserver_thread.await;
-    enet_server_thread.await;
+    match webserver_thread.await {
+        _ => (),
+    };
+    match enet_server_thread.await {
+        _ => (),
+    };
 }

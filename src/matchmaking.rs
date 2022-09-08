@@ -163,7 +163,7 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
             })
             .group_by(|peer| {
                 let CreateTicket { user, search, .. } = peer.data().unwrap();
-                vec![
+                return vec![
                     user.connect_code.clone(),
                     search.connect_code.clone().unwrap(),
                 ]
