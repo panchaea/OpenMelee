@@ -102,6 +102,7 @@ enum MatchmakingMessage {
         latest_version: String,
         match_id: String,
         is_host: bool,
+        is_assigned: bool,
         players: Vec<Player>,
         stages: Vec<Stage>,
     },
@@ -247,41 +248,73 @@ fn create_game(
     let first_message = MatchmakingMessage::GetTicketResponse {
         latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
         match_id: "123456789".to_string(),
-        is_host: false,
-        players: vec![Player {
-            is_local_player: false,
-            uid: second_user.uid.to_string(),
-            display_name: second_user.display_name.to_string(),
-            connect_code: second_user.connect_code.to_string(),
-            ip_address: format!(
-                "{}:{}",
-                second.address().ip().to_string(),
-                second.address().port().to_string()
-            ),
-            ip_address_lan: second_ip_address_lan.to_string(),
-            port: ControllerPort::Two,
-        }],
-        stages: vec![Stage::FinalDestination],
+        is_host: true,
+        is_assigned: true,
+        players: vec![
+            Player {
+                is_local_player: false,
+                uid: second_user.uid.to_string(),
+                display_name: second_user.display_name.to_string(),
+                connect_code: second_user.connect_code.to_string(),
+                ip_address: format!(
+                    "{}:{}",
+                    second.address().ip().to_string(),
+                    second.address().port().to_string()
+                ),
+                ip_address_lan: second_ip_address_lan.to_string(),
+                port: ControllerPort::One,
+            },
+            Player {
+                is_local_player: true,
+                uid: first_user.uid.to_string(),
+                display_name: first_user.display_name.to_string(),
+                connect_code: first_user.connect_code.to_string(),
+                ip_address: format!(
+                    "{}:{}",
+                    first.address().ip().to_string(),
+                    first.address().port().to_string()
+                ),
+                ip_address_lan: first_ip_address_lan.to_string(),
+                port: ControllerPort::Two,
+            },
+        ],
+        stages: stages.clone(),
     };
 
     let second_message = MatchmakingMessage::GetTicketResponse {
         latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
         match_id: "123456789".to_string(),
         is_host: false,
-        players: vec![Player {
-            is_local_player: false,
-            uid: first_user.uid.to_string(),
-            display_name: first_user.display_name.to_string(),
-            connect_code: first_user.connect_code.to_string(),
-            ip_address: format!(
-                "{}:{}",
-                first.address().ip().to_string(),
-                first.address().port().to_string()
-            ),
-            ip_address_lan: first_ip_address_lan.to_string(),
-            port: ControllerPort::One,
-        }],
-        stages: vec![Stage::FinalDestination],
+        is_assigned: true,
+        players: vec![
+            Player {
+                is_local_player: true,
+                uid: second_user.uid.to_string(),
+                display_name: second_user.display_name.to_string(),
+                connect_code: second_user.connect_code.to_string(),
+                ip_address: format!(
+                    "{}:{}",
+                    second.address().ip().to_string(),
+                    second.address().port().to_string()
+                ),
+                ip_address_lan: second_ip_address_lan.to_string(),
+                port: ControllerPort::One,
+            },
+            Player {
+                is_local_player: false,
+                uid: first_user.uid.to_string(),
+                display_name: first_user.display_name.to_string(),
+                connect_code: first_user.connect_code.to_string(),
+                ip_address: format!(
+                    "{}:{}",
+                    first.address().ip().to_string(),
+                    first.address().port().to_string()
+                ),
+                ip_address_lan: first_ip_address_lan.to_string(),
+                port: ControllerPort::Two,
+            },
+        ],
+        stages: stages.clone(),
     };
 
     (first_message, second_message)
@@ -349,6 +382,7 @@ fn can_create_get_ticket_response_message() {
         latest_version: String::from(LATEST_SLIPPI_CLIENT_VERSION),
         match_id: String::from("1"),
         is_host: false,
+        is_assigned: true,
         players: vec![Player {
             is_local_player: false,
             uid: String::from("1"),
