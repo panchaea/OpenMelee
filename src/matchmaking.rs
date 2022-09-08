@@ -84,11 +84,11 @@ struct CreateTicket {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "camelCase")]
 enum MatchmakingMessage {
-    #[serde(rename = "create-ticket-resp")]
+    #[serde(rename = "create-ticket-resp", rename_all = "camelCase")]
     CreateTicketResponse {},
-    #[serde(rename = "get-ticket-resp")]
+    #[serde(rename = "get-ticket-resp", rename_all = "camelCase")]
     GetTicketResponse {
         latest_version: String,
         match_id: String,
