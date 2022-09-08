@@ -192,10 +192,17 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
                     let (first_message, second_message) =
                         create_game(first.clone(), second.clone(), vec![Stage::FinalDestination]);
 
+                    let first_message_str = &serde_json::to_string(&first_message).unwrap();
+                    let second_message_str = &serde_json::to_string(&second_message).unwrap();
+                    println!(
+                        "Sending messages: \n{:?}\n{:?}",
+                        first_message_str, second_message_str
+                    );
+
                     first
                         .send_packet(
                             Packet::new(
-                                &serde_json::to_string(&first_message).unwrap().into_bytes(),
+                                &first_message_str.clone().into_bytes(),
                                 PacketMode::ReliableSequenced,
                             )
                             .unwrap(),
@@ -207,7 +214,7 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
                     second
                         .send_packet(
                             Packet::new(
-                                &serde_json::to_string(&second_message).unwrap().into_bytes(),
+                                &second_message_str.clone().into_bytes(),
                                 PacketMode::ReliableSequenced,
                             )
                             .unwrap(),
