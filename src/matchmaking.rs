@@ -4,6 +4,7 @@ use std::net::Ipv4Addr;
 use encoding_rs::SHIFT_JIS;
 use enet::*;
 use itertools::Itertools;
+use rand::seq::SliceRandom;
 use serde::{de, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use unicode_normalization::UnicodeNormalization;
@@ -245,6 +246,15 @@ fn create_game(
         ..
     } = second.data().unwrap();
 
+    let mut rng = &mut rand::thread_rng();
+    let ports = vec![ControllerPort::One, ControllerPort::Two];
+    let (first_port, second_port) = ports
+        .choose_multiple(&mut rng, 2)
+        .cloned()
+        .tuples()
+        .next()
+        .unwrap();
+
     let first_message = MatchmakingMessage::GetTicketResponse {
         latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
         match_id: "123456789".to_string(),
@@ -262,7 +272,7 @@ fn create_game(
                     second.address().port().to_string()
                 ),
                 ip_address_lan: second_ip_address_lan.to_string(),
-                port: ControllerPort::One,
+                port: second_port,
             },
             Player {
                 is_local_player: true,
@@ -275,7 +285,7 @@ fn create_game(
                     first.address().port().to_string()
                 ),
                 ip_address_lan: first_ip_address_lan.to_string(),
-                port: ControllerPort::Two,
+                port: first_port,
             },
         ],
         stages: stages.clone(),
@@ -298,7 +308,7 @@ fn create_game(
                     second.address().port().to_string()
                 ),
                 ip_address_lan: second_ip_address_lan.to_string(),
-                port: ControllerPort::One,
+                port: second_port,
             },
             Player {
                 is_local_player: false,
@@ -311,7 +321,7 @@ fn create_game(
                     first.address().port().to_string()
                 ),
                 ip_address_lan: first_ip_address_lan.to_string(),
-                port: ControllerPort::Two,
+                port: first_port,
             },
         ],
         stages: stages.clone(),
