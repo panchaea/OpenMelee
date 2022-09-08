@@ -1,5 +1,5 @@
 diff --git a/Source/Core/Core/ConfigManager.cpp b/Source/Core/Core/ConfigManager.cpp
-index e6c01cf57..6fc5f07a6 100644
+index e6c01cf57..8bf7eacde 100644
 --- a/Source/Core/Core/ConfigManager.cpp
 +++ b/Source/Core/Core/ConfigManager.cpp
 @@ -290,6 +290,8 @@ void SConfig::SaveCoreSettings(IniFile &ini)
@@ -15,21 +15,21 @@ index e6c01cf57..6fc5f07a6 100644
  	core->Get("SlippiReplayMonthFolders", &m_slippiReplayMonthFolders, false);
  	std::string default_replay_dir = File::GetHomeDirectory() + DIR_SEP + "Slippi";
  	core->Get("SlippiReplayDir", &m_strSlippiReplayDir, default_replay_dir);
-+	core->Set("SlippiMatchmakingHost", "mm.slippi.gg");
-+	core->Set("SlippiUserDiscoveryUrl", "https://users-rest-dot-slippi.uc.r.appspot.com/user");
++	core->Get("SlippiMatchmakingHost", &m_slippiMatchmakingHost, "mm.slippi.gg");
++	core->Get("SlippiUserDiscoveryUrl", &m_slippiUserDiscoveryUrl, "https://users-rest-dot-slippi.uc.r.appspot.com/user");
  	if (m_strSlippiReplayDir.empty())
  		m_strSlippiReplayDir = default_replay_dir;
  	core->Get("SlippiPlaybackDisplayFrameIndex", &m_slippiEnableFrameIndex, false);
 diff --git a/Source/Core/Core/ConfigManager.h b/Source/Core/Core/ConfigManager.h
-index 80a078972..43bb58a08 100644
+index 80a078972..42b4297fe 100644
 --- a/Source/Core/Core/ConfigManager.h
 +++ b/Source/Core/Core/ConfigManager.h
 @@ -160,6 +160,8 @@ struct SConfig : NonCopyable
  	int m_slippiEnableQuickChat = SLIPPI_CHAT_ON;
  	bool m_slippiReplayMonthFolders = false;
  	std::string m_strSlippiReplayDir;
-+	std::string m_slippiMatchmakingHost = "mm.slippi.gg";
-+	std::string m_slippiUserDiscoveryUrl = "https://users-rest-dot-slippi.uc.r.appspot.com/user";
++	std::string m_slippiMatchmakingHost;
++	std::string m_slippiUserDiscoveryUrl;
  	bool m_slippiForceNetplayPort = false;
  	int m_slippiNetplayPort;
  	bool m_slippiForceLanIp = false;
