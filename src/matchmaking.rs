@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::net::Ipv4Addr;
 
+use chrono::Utc;
 use encoding_rs::SHIFT_JIS;
 use enet::*;
 use itertools::Itertools;
@@ -242,6 +243,11 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
     }
 }
 
+fn get_match_id(mode: OnlinePlayMode) -> String {
+    let now = Utc::now();
+    format!("mode.{}-{}", mode, now.to_rfc3339())
+}
+
 fn create_game(
     first: Peer<CreateTicket>,
     second: Peer<CreateTicket>,
@@ -259,6 +265,8 @@ fn create_game(
         ..
     } = second.data().unwrap();
 
+    let match_id = get_match_id(OnlinePlayMode::Direct);
+
     let mut rng = &mut rand::thread_rng();
     let ports = vec![ControllerPort::One, ControllerPort::Two];
     let (first_port, second_port) = ports
@@ -270,7 +278,7 @@ fn create_game(
 
     let first_message = MatchmakingMessage::GetTicketResponse {
         latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
-        match_id: "123456789".to_string(),
+        match_id: match_id.clone(),
         is_host: true,
         is_assigned: true,
         players: vec![
@@ -298,7 +306,7 @@ fn create_game(
 
     let second_message = MatchmakingMessage::GetTicketResponse {
         latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
-        match_id: "123456789".to_string(),
+        match_id,
         is_host: false,
         is_assigned: true,
         players: vec![
@@ -387,7 +395,7 @@ fn can_parse_create_ticket_unranked_message() {
 fn can_create_get_ticket_response_message() {
     let _message = MatchmakingMessage::GetTicketResponse {
         latest_version: String::from(LATEST_SLIPPI_CLIENT_VERSION),
-        match_id: String::from("1"),
+        match_id: get_match_id(OnlinePlayMode::Direct),
         is_host: false,
         is_assigned: true,
         players: vec![Player {
