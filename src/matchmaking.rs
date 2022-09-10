@@ -354,10 +354,12 @@ fn create_game(
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use std::collections::hash_map::Entry::{Occupied, Vacant};
+    use std::collections::HashMap;
 
-    use rand::{seq::SliceRandom, Rng};
+    use rand::Rng;
+
+    use crate::matchmaking::*;
 
     #[test]
     fn can_parse_create_ticket_direct_message() {
