@@ -1,4 +1,5 @@
-use std::collections::HashSet;
+use std::collections::{HashSet,HashMap};
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::fmt;
 use std::net::Ipv4Addr;
 
@@ -6,7 +7,7 @@ use chrono::Utc;
 use encoding_rs::SHIFT_JIS;
 use enet::*;
 use itertools::Itertools;
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, Rng};
 use serde::{de, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use unicode_normalization::UnicodeNormalization;
@@ -205,8 +206,11 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
             })
             .for_each(|all_peers| {
                 for (mut first, mut second) in all_peers.clone().into_iter().tuples() {
-                    let (first_message, second_message) =
-                        create_game(first.clone(), second.clone(), vec![Stage::FinalDestination]);
+                    let (first_message, second_message) = create_game(
+                        (first.data().unwrap().clone(), first.address()),
+                        (second.data().unwrap().clone(), second.address()),
+                        vec![Stage::FinalDestination],
+                    );
 
                     let first_message_str = &serde_json::to_string(&first_message).unwrap();
                     let second_message_str = &serde_json::to_string(&second_message).unwrap();
@@ -249,21 +253,24 @@ fn get_match_id(mode: OnlinePlayMode) -> String {
 }
 
 fn create_game(
-    first: Peer<CreateTicket>,
-    second: Peer<CreateTicket>,
+    first: (CreateTicket, Address),
+    second: (CreateTicket, Address),
     stages: Vec<Stage>,
 ) -> (MatchmakingMessage, MatchmakingMessage) {
+    let (first_ticket, first_address) = first;
+    let (second_ticket, second_address) = second;
+
     let CreateTicket {
         user: first_user,
         ip_address_lan: first_ip_address_lan,
         ..
-    } = first.data().unwrap();
+    } = first_ticket;
 
     let CreateTicket {
         user: second_user,
         ip_address_lan: second_ip_address_lan,
         ..
-    } = second.data().unwrap();
+    } = second_ticket;
 
     let match_id = get_match_id(OnlinePlayMode::Direct);
 
@@ -287,7 +294,7 @@ fn create_game(
                 uid: second_user.uid.to_string(),
                 display_name: second_user.display_name.to_string(),
                 connect_code: second_user.connect_code.to_string(),
-                ip_address: format!("{}:{}", second.address().ip(), second.address().port()),
+                ip_address: format!("{}:{}", second_address.ip(), second_address.port()),
                 ip_address_lan: second_ip_address_lan.to_string(),
                 port: second_port,
             },
@@ -296,7 +303,7 @@ fn create_game(
                 uid: first_user.uid.to_string(),
                 display_name: first_user.display_name.to_string(),
                 connect_code: first_user.connect_code.to_string(),
-                ip_address: format!("{}:{}", first.address().ip(), first.address().port()),
+                ip_address: format!("{}:{}", first_address.ip(), first_address.port()),
                 ip_address_lan: first_ip_address_lan.to_string(),
                 port: first_port,
             },
@@ -315,7 +322,7 @@ fn create_game(
                 uid: second_user.uid.to_string(),
                 display_name: second_user.display_name.to_string(),
                 connect_code: second_user.connect_code.to_string(),
-                ip_address: format!("{}:{}", second.address().ip(), second.address().port()),
+                ip_address: format!("{}:{}", second_address.ip(), second_address.port()),
                 ip_address_lan: second_ip_address_lan.to_string(),
                 port: second_port,
             },
@@ -324,7 +331,7 @@ fn create_game(
                 uid: first_user.uid.to_string(),
                 display_name: first_user.display_name.to_string(),
                 connect_code: first_user.connect_code.to_string(),
-                ip_address: format!("{}:{}", first.address().ip(), first.address().port()),
+                ip_address: format!("{}:{}", first_address.ip(), first_address.port()),
                 ip_address_lan: first_ip_address_lan.to_string(),
                 port: first_port,
             },
@@ -409,4 +416,99 @@ fn can_create_get_ticket_response_message() {
         }],
         stages: vec![Stage::FountainOfDreams],
     };
+}
+
+#[test]
+fn create_game_direct_mode() {
+    let rng = &mut rand::thread_rng();
+    let first_port = rng.gen_range(40000..50000);
+    let second_port = rng.gen_range(40000..50000);
+    let first_ticket = CreateTicket {
+        app_version: String::from(LATEST_SLIPPI_CLIENT_VERSION),
+        ip_address_lan: format!("127.0.0.1:{}", first_port),
+        search: Search {
+            mode: OnlinePlayMode::Direct,
+            connect_code: Some(String::from("TEST#002")),
+        },
+        user: User {
+            uid: String::from("1234"),
+            play_key: String::from("5678"),
+            display_name: String::from("test"),
+            connect_code: String::from("TEST#001"),
+        },
+    };
+    let first_address = Address::new(Ipv4Addr::LOCALHOST, first_port);
+    let second_ticket = CreateTicket {
+        app_version: String::from(LATEST_SLIPPI_CLIENT_VERSION),
+        ip_address_lan: format!("127.0.0.1:{}", second_port),
+        search: Search {
+            mode: OnlinePlayMode::Direct,
+            connect_code: Some(String::from("TEST#001")),
+        },
+        user: User {
+            uid: String::from("4321"),
+            play_key: String::from("8765"),
+            display_name: String::from("test-2"),
+            connect_code: String::from("TEST#002"),
+        },
+    };
+    let second_address = Address::new(Ipv4Addr::LOCALHOST, second_port);
+
+    let (first_message, second_message) = create_game(
+        (first_ticket, first_address),
+        (second_ticket, second_address),
+        vec![],
+    );
+
+    assert!(matches!(
+        first_message,
+        MatchmakingMessage::GetTicketResponse { .. }
+    ));
+    assert!(matches!(
+        second_message,
+        MatchmakingMessage::GetTicketResponse { .. }
+    ));
+
+    let messages = vec![first_message, second_message];
+
+    let mut is_host_count = 0;
+    let mut port_by_uid: HashMap<String, ControllerPort> = HashMap::new();
+    let mut _stages: Option<Vec<Stage>> = None;
+    messages.iter().for_each(|message| {
+        match message {
+            MatchmakingMessage::GetTicketResponse {
+                is_host, players, stages, ..
+            } => {
+                // Stages should match in all messages
+                match _stages.clone() {
+                    Some(s) => assert_eq!(s, stages.clone()),
+                    _ => _stages = Some(stages.clone()),
+                }
+                let mut is_local_player_count = 0;
+                players.iter().for_each(|player| {
+                    // Each player has the same port assignment in all messages
+                    match port_by_uid.entry(player.uid.clone()) {
+                        Occupied(p) => assert_eq!(player.port, p.get().clone()),
+                        Vacant(v) => {
+                            v.insert(player.port);
+                        },
+                    }
+                    if player.is_local_player {
+                        is_local_player_count += 1
+                    }
+                });
+
+                // Each message has one local player
+                assert_eq!(is_local_player_count, 1);
+
+                if is_host.clone() {
+                    is_host_count += 1
+                };
+            }
+            _ => (),
+        }
+    });
+
+    // Each set of messages has one message with is_host: true
+    assert_eq!(is_host_count, 1);
 }
