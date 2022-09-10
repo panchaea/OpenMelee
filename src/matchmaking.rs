@@ -374,7 +374,7 @@ mod test {
                 "appVersion": "2.5.1",
                 "ipAddressLan": "127.0.0.2:50285",
                 "search": {
-                    "connectCode": [130, 115, 130, 100, 130, 114, 130, 115, 129, 148, 130, 79, 130, 79, 130, 80],
+                    "connectCode": [130, 115, 130, 100, 130, 114, 130, 115, 129, 148, 130, 79, 130, 79, 130, 81],
                     "mode": 2
                 },
                 "user": {
@@ -389,7 +389,7 @@ mod test {
         .unwrap();
 
         assert_eq!(app_version, "2.5.1");
-        assert_eq!(search.connect_code.as_ref().unwrap(), "TEST#001");
+        assert_eq!(search.connect_code.as_ref().unwrap(), "TEST#002");
     }
 
     #[test]
