@@ -1,0 +1,7 @@
+pipeline:
+  test:
+    image: nixos/nix
+    when:
+      event: [push, pull_request, tag, deployment]
+    commands:
+      - nix --extra-experimental-features 'nix-command flakes' flake check
