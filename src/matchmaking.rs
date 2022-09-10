@@ -58,6 +58,31 @@ struct Player {
     connect_code: String,
 }
 
+impl Player {
+    fn new(
+        ticket: CreateTicket,
+        address: Address,
+        is_local_player: bool,
+        port: ControllerPort,
+    ) -> Player {
+        let CreateTicket {
+            user,
+            ip_address_lan,
+            ..
+        } = ticket;
+
+        Player {
+            uid: user.uid,
+            display_name: user.display_name,
+            connect_code: user.connect_code,
+            ip_address: format!("{}:{}", address.ip(), address.port()),
+            ip_address_lan,
+            is_local_player,
+            port,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 enum ControllerPort {
@@ -279,19 +304,6 @@ fn create_game(
     let (first_ticket, first_address) = first;
     let (second_ticket, second_address) = second;
     let stages = Stage::get_allowed_stages(mode);
-
-    let CreateTicket {
-        user: first_user,
-        ip_address_lan: first_ip_address_lan,
-        ..
-    } = first_ticket;
-
-    let CreateTicket {
-        user: second_user,
-        ip_address_lan: second_ip_address_lan,
-        ..
-    } = second_ticket;
-
     let match_id = get_match_id(mode);
 
     let mut rng = &mut rand::thread_rng();
@@ -309,24 +321,18 @@ fn create_game(
         is_host: true,
         is_assigned: true,
         players: vec![
-            Player {
-                is_local_player: false,
-                uid: second_user.uid.to_string(),
-                display_name: second_user.display_name.to_string(),
-                connect_code: second_user.connect_code.to_string(),
-                ip_address: format!("{}:{}", second_address.ip(), second_address.port()),
-                ip_address_lan: second_ip_address_lan.to_string(),
-                port: second_port,
-            },
-            Player {
-                is_local_player: true,
-                uid: first_user.uid.to_string(),
-                display_name: first_user.display_name.to_string(),
-                connect_code: first_user.connect_code.to_string(),
-                ip_address: format!("{}:{}", first_address.ip(), first_address.port()),
-                ip_address_lan: first_ip_address_lan.to_string(),
-                port: first_port,
-            },
+            Player::new(
+                second_ticket.clone(),
+                second_address.clone(),
+                false,
+                second_port,
+            ),
+            Player::new(
+                first_ticket.clone(),
+                first_address.clone(),
+                true,
+                first_port,
+            ),
         ],
         stages: stages.clone(),
     };
@@ -337,24 +343,8 @@ fn create_game(
         is_host: false,
         is_assigned: true,
         players: vec![
-            Player {
-                is_local_player: true,
-                uid: second_user.uid.to_string(),
-                display_name: second_user.display_name.to_string(),
-                connect_code: second_user.connect_code,
-                ip_address: format!("{}:{}", second_address.ip(), second_address.port()),
-                ip_address_lan: second_ip_address_lan,
-                port: second_port,
-            },
-            Player {
-                is_local_player: false,
-                uid: first_user.uid.to_string(),
-                display_name: first_user.display_name.to_string(),
-                connect_code: first_user.connect_code,
-                ip_address: format!("{}:{}", first_address.ip(), first_address.port()),
-                ip_address_lan: first_ip_address_lan,
-                port: first_port,
-            },
+            Player::new(second_ticket, second_address, true, second_port),
+            Player::new(first_ticket, first_address, false, first_port),
         ],
         stages,
     };
