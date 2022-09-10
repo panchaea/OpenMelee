@@ -6,7 +6,7 @@ use chrono::Utc;
 use encoding_rs::SHIFT_JIS;
 use enet::*;
 use itertools::Itertools;
-use rand::seq::SliceRandom;
+use rand::{seq::IteratorRandom, seq::SliceRandom, thread_rng};
 use serde::{de, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use unicode_normalization::UnicodeNormalization;
@@ -90,6 +90,21 @@ enum ControllerPort {
     Two = 2,
     Three = 3,
     Four = 4,
+}
+
+impl ControllerPort {
+    fn get_ports(num_players: usize) -> Vec<ControllerPort> {
+        if num_players == 4 {
+            vec![
+                ControllerPort::One,
+                ControllerPort::Two,
+                ControllerPort::Three,
+                ControllerPort::Four,
+            ]
+        } else {
+            vec![ControllerPort::One, ControllerPort::Two]
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
@@ -222,15 +237,25 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
             _ => (),
         }
 
-        host.peers()
-            .collect_vec()
-            .clone()
-            .into_iter()
-            .filter(|peer| peer.state() == PeerState::Connected)
-            .filter(|peer| match peer.data() {
-                Some(CreateTicket { search, .. }) => search.mode == OnlinePlayMode::Direct,
-                _ => false,
-            })
+        let connected_peers = host
+            .peers()
+            .filter(|peer| peer.state() == PeerState::Connected);
+
+        let direct_peers = connected_peers.filter(|peer| match peer.data() {
+            Some(CreateTicket { search, .. }) => search.mode == OnlinePlayMode::Direct,
+            _ => false,
+        });
+
+        handle_matchmaking(OnlinePlayMode::Direct, direct_peers.collect());
+    }
+}
+
+fn handle_matchmaking(mode: OnlinePlayMode, peers: Vec<Peer<CreateTicket>>) {
+    let mut matched_peers: Vec<Vec<Peer<CreateTicket>>> = vec![];
+
+    if mode == OnlinePlayMode::Direct {
+        peers
+            .iter()
             .group_by(|peer| {
                 let CreateTicket { user, search, .. } = peer.data().unwrap();
                 vec![
@@ -241,54 +266,43 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
                 .collect::<HashSet<_>>()
             })
             .into_iter()
-            .filter_map(|(_, all_peers)| {
-                let vec = all_peers.collect_vec().clone();
-                match vec.len() {
-                    2 => Some(vec),
-                    _ => None,
-                }
-            })
-            .for_each(|all_peers| {
-                for (mut first, mut second) in all_peers.clone().into_iter().tuples() {
-                    let (first_message, second_message) = create_game(
-                        (first.data().unwrap().clone(), first.address()),
-                        (second.data().unwrap().clone(), second.address()),
-                        OnlinePlayMode::Direct,
-                    );
-
-                    let first_message_str = &serde_json::to_string(&first_message).unwrap();
-                    let second_message_str = &serde_json::to_string(&second_message).unwrap();
-                    println!(
-                        "Sending messages: \n{:?}\n{:?}",
-                        first_message_str, second_message_str
-                    );
-
-                    first
-                        .send_packet(
-                            Packet::new(
-                                &first_message_str.clone().into_bytes(),
-                                PacketMode::ReliableSequenced,
-                            )
-                            .unwrap(),
-                            ENET_CHANNEL_ID,
-                        )
-                        .unwrap();
-                    first.set_data(None);
-
-                    second
-                        .send_packet(
-                            Packet::new(
-                                &second_message_str.clone().into_bytes(),
-                                PacketMode::ReliableSequenced,
-                            )
-                            .unwrap(),
-                            ENET_CHANNEL_ID,
-                        )
-                        .unwrap();
-                    second.set_data(None);
+            .for_each(|(_, peer_group)| {
+                let peer_vec = peer_group.collect_vec();
+                if peer_vec.len() > 1 {
+                    matched_peers.push(peer_vec.clone().into_iter().cloned().collect_vec());
                 }
             });
     }
+
+    matched_peers.iter().for_each(|_peers| {
+        let messages = create_game(
+            _peers
+                .clone()
+                .iter()
+                .map(|peer| (peer.data().unwrap().clone(), peer.address()))
+                .collect(),
+            mode,
+        );
+        _peers
+            .clone()
+            .iter()
+            .zip(messages)
+            .map(|(_peer, message)| {
+                let peer = &mut _peer.clone();
+                let message_str = &serde_json::to_string(&message).unwrap();
+                println!("Sending message: \n{:?}", message_str,);
+                peer.send_packet(
+                    Packet::new(
+                        &message_str.clone().into_bytes(),
+                        PacketMode::ReliableSequenced,
+                    )
+                    .unwrap(),
+                    ENET_CHANNEL_ID,
+                )
+                .unwrap();
+            })
+            .for_each(drop);
+    })
 }
 
 fn get_match_id(mode: OnlinePlayMode) -> String {
@@ -297,59 +311,43 @@ fn get_match_id(mode: OnlinePlayMode) -> String {
 }
 
 fn create_game(
-    first: (CreateTicket, Address),
-    second: (CreateTicket, Address),
+    _players: Vec<(CreateTicket, Address)>,
     mode: OnlinePlayMode,
-) -> (MatchmakingMessage, MatchmakingMessage) {
-    let (first_ticket, first_address) = first;
-    let (second_ticket, second_address) = second;
-    let stages = Stage::get_allowed_stages(mode);
+) -> Vec<MatchmakingMessage> {
+    let mut rng = thread_rng();
     let match_id = get_match_id(mode);
-
-    let mut rng = &mut rand::thread_rng();
-    let ports = vec![ControllerPort::One, ControllerPort::Two];
-    let (first_port, second_port) = ports
-        .choose_multiple(&mut rng, 2)
+    let stages = Stage::get_allowed_stages(mode);
+    let ports = ControllerPort::get_ports(_players.len());
+    let randomized_ports: Vec<ControllerPort> = ports
+        .choose_multiple(&mut rng, _players.len())
         .cloned()
-        .tuples()
-        .next()
-        .unwrap();
+        .collect();
+    let host_port = ports.iter().choose(&mut rng);
 
-    let first_message = MatchmakingMessage::GetTicketResponse {
-        latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
-        match_id: match_id.clone(),
-        is_host: true,
-        is_assigned: true,
-        players: vec![
-            Player::new(
-                second_ticket.clone(),
-                second_address.clone(),
-                false,
-                second_port,
-            ),
-            Player::new(
-                first_ticket.clone(),
-                first_address.clone(),
-                true,
-                first_port,
-            ),
-        ],
-        stages: stages.clone(),
-    };
-
-    let second_message = MatchmakingMessage::GetTicketResponse {
-        latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
-        match_id,
-        is_host: false,
-        is_assigned: true,
-        players: vec![
-            Player::new(second_ticket, second_address, true, second_port),
-            Player::new(first_ticket, first_address, false, first_port),
-        ],
-        stages,
-    };
-
-    (first_message, second_message)
+    _players
+        .iter()
+        .enumerate()
+        .map(|(i, _)| MatchmakingMessage::GetTicketResponse {
+            latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
+            match_id: match_id.clone(),
+            is_host: *ports.get(i).unwrap() == *host_port.unwrap(),
+            is_assigned: true,
+            players: _players
+                .clone()
+                .iter()
+                .enumerate()
+                .map(|(j, (_ticket, _address))| {
+                    Player::new(
+                        _ticket.clone(),
+                        _address.clone(),
+                        i == j,
+                        *randomized_ports.get(j).unwrap(),
+                    )
+                })
+                .collect(),
+            stages: stages.clone(),
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -473,22 +471,15 @@ mod test {
         };
         let second_address = Address::new(Ipv4Addr::LOCALHOST, second_port);
 
-        let (first_message, second_message) = create_game(
-            (first_ticket, first_address),
-            (second_ticket, second_address),
+        let messages = create_game(
+            vec![
+                (first_ticket, first_address),
+                (second_ticket, second_address),
+            ],
             OnlinePlayMode::Direct,
         );
 
-        assert!(matches!(
-            first_message,
-            MatchmakingMessage::GetTicketResponse { .. }
-        ));
-        assert!(matches!(
-            second_message,
-            MatchmakingMessage::GetTicketResponse { .. }
-        ));
-
-        let messages = vec![first_message, second_message];
+        assert_eq!(messages.len(), 2);
 
         let mut is_host_count = 0;
         let mut port_by_uid: HashMap<String, ControllerPort> = HashMap::new();
