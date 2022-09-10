@@ -54,8 +54,8 @@ pub async fn start_server(host: IpAddr, port: u16) {
                 .load::<User>(connection)
                 .expect("Error connecting to database");
 
-            match _users.iter().nth(0) {
-                Some(user) => warp::reply::json(&PublicUser::from(user.clone())),
+            match _users.get(0) {
+                Some(user) => warp::reply::json(&PublicUser::from(user)),
                 _ => warp::reply::json(&UserNotFound {
                     latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
                 }),

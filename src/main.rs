@@ -20,10 +20,10 @@ async fn main() {
 
     println!("Started matchmaking server");
 
-    match webserver_thread.await {
-        _ => (),
-    };
-    match enet_server_thread.await {
-        _ => (),
-    };
+    if (webserver_thread.await).is_err() {
+        println!("webserver thread exited abnormally")
+    }
+    if (enet_server_thread.await).is_err() {
+        println!("ENet server thread exited abnormally")
+    }
 }

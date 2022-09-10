@@ -187,12 +187,12 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
             })
             .group_by(|peer| {
                 let CreateTicket { user, search, .. } = peer.data().unwrap();
-                return vec![
+                vec![
                     user.connect_code.clone(),
                     search.connect_code.clone().unwrap(),
                 ]
                 .into_iter()
-                .collect::<HashSet<_>>();
+                .collect::<HashSet<_>>()
             })
             .into_iter()
             .filter_map(|(_, all_peers)| {
@@ -279,11 +279,7 @@ fn create_game(
                 uid: second_user.uid.to_string(),
                 display_name: second_user.display_name.to_string(),
                 connect_code: second_user.connect_code.to_string(),
-                ip_address: format!(
-                    "{}:{}",
-                    second.address().ip().to_string(),
-                    second.address().port().to_string()
-                ),
+                ip_address: format!("{}:{}", second.address().ip(), second.address().port()),
                 ip_address_lan: second_ip_address_lan.to_string(),
                 port: second_port,
             },
@@ -292,11 +288,7 @@ fn create_game(
                 uid: first_user.uid.to_string(),
                 display_name: first_user.display_name.to_string(),
                 connect_code: first_user.connect_code.to_string(),
-                ip_address: format!(
-                    "{}:{}",
-                    first.address().ip().to_string(),
-                    first.address().port().to_string()
-                ),
+                ip_address: format!("{}:{}", first.address().ip(), first.address().port()),
                 ip_address_lan: first_ip_address_lan.to_string(),
                 port: first_port,
             },
@@ -315,11 +307,7 @@ fn create_game(
                 uid: second_user.uid.to_string(),
                 display_name: second_user.display_name.to_string(),
                 connect_code: second_user.connect_code.to_string(),
-                ip_address: format!(
-                    "{}:{}",
-                    second.address().ip().to_string(),
-                    second.address().port().to_string()
-                ),
+                ip_address: format!("{}:{}", second.address().ip(), second.address().port()),
                 ip_address_lan: second_ip_address_lan.to_string(),
                 port: second_port,
             },
@@ -328,16 +316,12 @@ fn create_game(
                 uid: first_user.uid.to_string(),
                 display_name: first_user.display_name.to_string(),
                 connect_code: first_user.connect_code.to_string(),
-                ip_address: format!(
-                    "{}:{}",
-                    first.address().ip().to_string(),
-                    first.address().port().to_string()
-                ),
+                ip_address: format!("{}:{}", first.address().ip(), first.address().port()),
                 ip_address_lan: first_ip_address_lan.to_string(),
                 port: first_port,
             },
         ],
-        stages: stages.clone(),
+        stages,
     };
 
     (first_message, second_message)

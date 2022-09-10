@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Queryable, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Queryable, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub uid: String,
