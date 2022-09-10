@@ -1,5 +1,5 @@
-use std::collections::{HashSet,HashMap};
 use std::collections::hash_map::Entry::{Occupied, Vacant};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::net::Ipv4Addr;
 
@@ -97,6 +97,25 @@ enum Stage {
     DreamLand = 0x1C,
     Battlefield = 0x1F,
     FinalDestination = 0x20,
+}
+
+impl Stage {
+    fn get_allowed_stages(mode: OnlinePlayMode) -> Vec<Stage> {
+        let mut allowed_stages = vec![
+            Stage::PokemonStadium,
+            Stage::YoshisStory,
+            Stage::DreamLand,
+            Stage::Battlefield,
+            Stage::FinalDestination,
+        ];
+        match mode {
+            OnlinePlayMode::Teams => allowed_stages,
+            _ => {
+                allowed_stages.push(Stage::FountainOfDreams);
+                allowed_stages
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -209,7 +228,7 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
                     let (first_message, second_message) = create_game(
                         (first.data().unwrap().clone(), first.address()),
                         (second.data().unwrap().clone(), second.address()),
-                        vec![Stage::FinalDestination],
+                        OnlinePlayMode::Direct,
                     );
 
                     let first_message_str = &serde_json::to_string(&first_message).unwrap();
@@ -255,10 +274,11 @@ fn get_match_id(mode: OnlinePlayMode) -> String {
 fn create_game(
     first: (CreateTicket, Address),
     second: (CreateTicket, Address),
-    stages: Vec<Stage>,
+    mode: OnlinePlayMode,
 ) -> (MatchmakingMessage, MatchmakingMessage) {
     let (first_ticket, first_address) = first;
     let (second_ticket, second_address) = second;
+    let stages = Stage::get_allowed_stages(mode);
 
     let CreateTicket {
         user: first_user,
@@ -272,7 +292,7 @@ fn create_game(
         ..
     } = second_ticket;
 
-    let match_id = get_match_id(OnlinePlayMode::Direct);
+    let match_id = get_match_id(mode);
 
     let mut rng = &mut rand::thread_rng();
     let ports = vec![ControllerPort::One, ControllerPort::Two];
@@ -414,7 +434,7 @@ fn can_create_get_ticket_response_message() {
             ip_address_lan: String::from("127.0.0.1:48593"),
             port: ControllerPort::One,
         }],
-        stages: vec![Stage::FountainOfDreams],
+        stages: Stage::get_allowed_stages(OnlinePlayMode::Direct),
     };
 }
 
@@ -457,7 +477,7 @@ fn create_game_direct_mode() {
     let (first_message, second_message) = create_game(
         (first_ticket, first_address),
         (second_ticket, second_address),
-        vec![],
+        OnlinePlayMode::Direct,
     );
 
     assert!(matches!(
@@ -477,7 +497,10 @@ fn create_game_direct_mode() {
     messages.iter().for_each(|message| {
         match message {
             MatchmakingMessage::GetTicketResponse {
-                is_host, players, stages, ..
+                is_host,
+                players,
+                stages,
+                ..
             } => {
                 // Stages should match in all messages
                 match _stages.clone() {
@@ -491,7 +514,7 @@ fn create_game_direct_mode() {
                         Occupied(p) => assert_eq!(player.port, p.get().clone()),
                         Vacant(v) => {
                             v.insert(player.port);
-                        },
+                        }
                     }
                     if player.is_local_player {
                         is_local_player_count += 1
