@@ -14,6 +14,7 @@ use unicode_normalization::UnicodeNormalization;
 use slippi_re::LATEST_SLIPPI_CLIENT_VERSION;
 
 const ENET_CHANNEL_ID: u8 = 0;
+const ENET_MAX_PEERS: u64 = 1024;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -148,7 +149,7 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
     let mut host = enet
         .create_host::<CreateTicket>(
             Some(&listen_address),
-            10,
+            ENET_MAX_PEERS,
             ChannelLimit::Maximum,
             BandwidthLimit::Unlimited,
             BandwidthLimit::Unlimited,
