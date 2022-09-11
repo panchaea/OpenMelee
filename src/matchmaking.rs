@@ -210,9 +210,10 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
 
                 println!("{:?}", packet_data);
 
+                sender.set_data(Some(message.clone()));
+
                 match message.search.mode {
                     OnlinePlayMode::Direct => {
-                        sender.set_data(Some(message.clone()));
                         sender
                             .send_packet(
                                 Packet::new(
