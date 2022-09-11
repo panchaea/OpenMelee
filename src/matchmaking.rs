@@ -14,7 +14,6 @@ use unicode_normalization::UnicodeNormalization;
 use slippi_re::LATEST_SLIPPI_CLIENT_VERSION;
 
 const ENET_CHANNEL_ID: u8 = 0;
-const ENET_MAX_PEERS: u64 = 1024;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -183,13 +182,13 @@ enum MatchmakingMessage {
     },
 }
 
-pub fn start_server(host: Ipv4Addr, port: u16) {
+pub fn start_server(host: Ipv4Addr, port: u16, max_peers: u64) {
     let enet = Enet::new().expect("Could not initialize ENet");
     let listen_address = Address::new(host, port);
     let mut host = enet
         .create_host::<CreateTicket>(
             Some(&listen_address),
-            ENET_MAX_PEERS,
+            max_peers,
             ChannelLimit::Maximum,
             BandwidthLimit::Unlimited,
             BandwidthLimit::Unlimited,

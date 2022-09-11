@@ -37,16 +37,16 @@ impl From<&User> for PublicUser {
     }
 }
 
-pub async fn start_server(host: IpAddr, port: u16) {
+pub async fn start_server(host: IpAddr, port: u16, database_url: String) {
     let socket_address = SocketAddr::new(host, port);
 
     let get_user = warp::get()
         .and(warp::path("user"))
         .and(warp::path::param::<String>())
-        .map(|_uid: String| {
+        .map(move |_uid: String| {
             println!("Received get_user request");
 
-            let connection = &mut establish_connection();
+            let connection = &mut establish_connection(database_url.clone());
 
             let _users = users
                 .filter(uid.eq(_uid))
