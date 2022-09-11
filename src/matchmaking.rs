@@ -239,14 +239,14 @@ pub fn start_server(host: Ipv4Addr, port: u16) {
 
         let connected_peers = host
             .peers()
-            .filter(|peer| peer.state() == PeerState::Connected);
+            .filter(|peer| peer.state() == PeerState::Connected)
+            .filter(|peer| peer.data().is_some());
 
-        let direct_peers = connected_peers.filter(|peer| match peer.data() {
-            Some(CreateTicket { search, .. }) => search.mode == OnlinePlayMode::Direct,
-            _ => false,
+        let peers_by_game_mode = connected_peers.group_by(|peer| peer.data().unwrap().search.mode);
+
+        peers_by_game_mode.into_iter().for_each(|(mode, peers)| {
+            handle_matchmaking(mode, peers.collect_vec());
         });
-
-        handle_matchmaking(OnlinePlayMode::Direct, direct_peers.collect());
     }
 }
 
