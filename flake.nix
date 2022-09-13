@@ -8,9 +8,12 @@
     ssbm-nix.url = "github:djanatyn/ssbm-nix";
     ssbm-nix.inputs.nixpkgs.follows = "nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
+    pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
+    pre-commit-hooks.inputs.flake-utils.follows = "flake-utils";
   };
 
-  outputs = { self, nixpkgs, crane, ssbm-nix, flake-utils, ... }:
+  outputs = { self, nixpkgs, crane, ssbm-nix, flake-utils, pre-commit-hooks, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -36,6 +39,14 @@
       in {
         devShells.default = pkgs.mkShell {
           inherit (crateBuildAttrs) LIBCLANG_PATH nativeBuildInputs;
+          inherit (pre-commit-hooks.lib.${system}.run {
+            inherit src;
+            hooks = {
+              rustfmt.enable = true;
+              clippy.enable = true;
+              cargo-check.enable = true;
+            };
+          });
           buildInputs = crateBuildAttrs.buildInputs ++ [
             pkgs.cargo
             pkgs.clippy
