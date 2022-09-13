@@ -1,7 +1,7 @@
-use diesel::prelude::*;
 use bson::{oid::ObjectId, Uuid};
-use serde::{Deserialize, Serialize};
+use diesel::prelude::*;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 const CONNECT_CODE_VALIDATION_REGEX: &str = r"^[A-Z]{4}#\d{3}$";
 
