@@ -82,7 +82,7 @@ impl Player {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 enum ControllerPort {
     One = 1,
@@ -92,16 +92,15 @@ enum ControllerPort {
 }
 
 impl ControllerPort {
-    fn get_ports(num_players: usize) -> Vec<ControllerPort> {
-        if num_players == 4 {
-            vec![
+    fn get_ports(mode: OnlinePlayMode) -> Vec<ControllerPort> {
+        match mode {
+            OnlinePlayMode::Teams => vec![
                 ControllerPort::One,
                 ControllerPort::Two,
                 ControllerPort::Three,
                 ControllerPort::Four,
-            ]
-        } else {
-            vec![ControllerPort::One, ControllerPort::Two]
+            ],
+            _ => vec![ControllerPort::One, ControllerPort::Two]
         }
     }
 }
@@ -317,7 +316,7 @@ fn create_game(
     let mut rng = thread_rng();
     let match_id = get_match_id(mode);
     let stages = Stage::get_allowed_stages(mode);
-    let ports = ControllerPort::get_ports(_players.len());
+    let ports = ControllerPort::get_ports(mode);
     let randomized_ports: Vec<ControllerPort> = ports
         .choose_multiple(&mut rng, _players.len())
         .cloned()
@@ -556,5 +555,17 @@ mod test {
         assert_eq!(ranked_stages.into_iter().unique().collect_vec().len(), 6);
         assert_eq!(direct_stages.contains(&Stage::FountainOfDreams), true);
         assert_eq!(direct_stages.into_iter().unique().collect_vec().len(), 6);
+    }
+
+    #[test]
+    fn test_get_ports_returns_correct_number_of_unique_ports() {
+        let unranked_ports = ControllerPort::get_ports(OnlinePlayMode::Unranked);
+        let ranked_ports = ControllerPort::get_ports(OnlinePlayMode::Ranked);
+        let direct_ports = ControllerPort::get_ports(OnlinePlayMode::Direct);
+        let teams_ports = ControllerPort::get_ports(OnlinePlayMode::Teams);
+        assert_eq!(unranked_ports.into_iter().unique().collect_vec().len(), 2);
+        assert_eq!(ranked_ports.into_iter().unique().collect_vec().len(), 2);
+        assert_eq!(direct_ports.into_iter().unique().collect_vec().len(), 2);
+        assert_eq!(teams_ports.into_iter().unique().collect_vec().len(), 4);
     }
 }
