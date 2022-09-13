@@ -433,7 +433,7 @@ mod test {
             stages: Stage::get_allowed_stages(OnlinePlayMode::Direct),
         };
 
-        serde_json::to_string(&message);
+        assert!(serde_json::to_string(&message).is_ok());
     }
 
     #[test]
