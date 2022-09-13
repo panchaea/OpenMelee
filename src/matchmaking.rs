@@ -486,40 +486,39 @@ mod test {
         let mut port_by_uid: HashMap<String, ControllerPort> = HashMap::new();
         let mut _stages: Option<Vec<Stage>> = None;
         messages.iter().for_each(|message| {
-            match message {
-                MatchmakingMessage::GetTicketResponse {
-                    is_host,
-                    players,
-                    stages,
-                    ..
-                } => {
-                    // Stages should match in all messages
-                    match _stages.clone() {
-                        Some(s) => assert_eq!(s, stages.clone()),
-                        _ => _stages = Some(stages.clone()),
-                    }
-                    let mut is_local_player_count = 0;
-                    players.iter().for_each(|player| {
-                        // Each player has the same port assignment in all messages
-                        match port_by_uid.entry(player.uid.clone()) {
-                            Occupied(p) => assert_eq!(player.port, p.get().clone()),
-                            Vacant(v) => {
-                                v.insert(player.port);
-                            }
-                        }
-                        if player.is_local_player {
-                            is_local_player_count += 1
-                        }
-                    });
-
-                    // Each message has one local player
-                    assert_eq!(is_local_player_count, 1);
-
-                    if is_host.clone() {
-                        is_host_count += 1
-                    };
+            if let MatchmakingMessage::GetTicketResponse {
+                is_host,
+                players,
+                stages,
+                ..
+            } = message {
+                // Stages should match in all messages
+                match _stages.clone() {
+                    Some(s) => assert_eq!(s, stages.clone()),
+                    _ => _stages = Some(stages.clone()),
                 }
-                _ => (),
+                let mut is_local_player_count = 0;
+                players.iter().for_each(|player| {
+                    // Each player has the same port assignment in all messages
+                    match port_by_uid.entry(player.uid.clone()) {
+                        Occupied(p) => assert_eq!(player.port, p.get().clone()),
+                        Vacant(v) => {
+                            v.insert(player.port);
+                        }
+                    }
+                    if player.is_local_player {
+                        is_local_player_count += 1
+                    }
+                });
+
+                // Each message has one local player
+                assert_eq!(is_local_player_count, 1);
+
+                if *is_host {
+                    is_host_count += 1
+                };
+            } else {
+                assert!(false);
             }
         });
 
