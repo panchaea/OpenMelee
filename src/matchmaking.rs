@@ -525,4 +525,32 @@ mod test {
         // Each set of messages has one message with is_host: true
         assert_eq!(is_host_count, 1);
     }
+
+    #[test]
+    fn test_get_allowed_stages_includes_battlefield_for_all_modes() {
+        let unranked_stages = Stage::get_allowed_stages(OnlinePlayMode::Unranked);
+        let ranked_stages = Stage::get_allowed_stages(OnlinePlayMode::Unranked);
+        let direct_stages = Stage::get_allowed_stages(OnlinePlayMode::Direct);
+        let teams_stages = Stage::get_allowed_stages(OnlinePlayMode::Teams);
+        assert_eq!(unranked_stages.contains(&Stage::Battlefield), true);
+        assert_eq!(ranked_stages.contains(&Stage::Battlefield), true);
+        assert_eq!(direct_stages.contains(&Stage::Battlefield), true);
+        assert_eq!(teams_stages.contains(&Stage::Battlefield), true);
+    }
+
+    #[test]
+    fn test_get_allowed_stages_does_not_include_fountain_of_dreams_for_teams() {
+        let stages = Stage::get_allowed_stages(OnlinePlayMode::Teams);
+        assert_eq!(stages.contains(&Stage::FountainOfDreams), false);
+    }
+
+    #[test]
+    fn test_get_allowed_stages_does_include_fountain_of_dreams_for_other_modes() {
+        let unranked_stages = Stage::get_allowed_stages(OnlinePlayMode::Unranked);
+        let ranked_stages = Stage::get_allowed_stages(OnlinePlayMode::Unranked);
+        let direct_stages = Stage::get_allowed_stages(OnlinePlayMode::Direct);
+        assert_eq!(unranked_stages.contains(&Stage::FountainOfDreams), true);
+        assert_eq!(ranked_stages.contains(&Stage::FountainOfDreams), true);
+        assert_eq!(direct_stages.contains(&Stage::FountainOfDreams), true);
+    }
 }
