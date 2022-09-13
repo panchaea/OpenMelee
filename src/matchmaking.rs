@@ -491,7 +491,8 @@ mod test {
                 players,
                 stages,
                 ..
-            } = message {
+            } = message
+            {
                 // Stages should match in all messages
                 match _stages.clone() {
                     Some(s) => assert_eq!(s, stages.clone()),
