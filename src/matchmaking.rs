@@ -127,7 +127,7 @@ impl fmt::Display for OnlinePlayMode {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 enum Stage {
     FountainOfDreams = 0x2,
@@ -542,6 +542,7 @@ mod test {
     fn test_get_allowed_stages_does_not_include_fountain_of_dreams_for_teams() {
         let stages = Stage::get_allowed_stages(OnlinePlayMode::Teams);
         assert_eq!(stages.contains(&Stage::FountainOfDreams), false);
+        assert_eq!(stages.into_iter().unique().collect_vec().len(), 5);
     }
 
     #[test]
@@ -550,7 +551,10 @@ mod test {
         let ranked_stages = Stage::get_allowed_stages(OnlinePlayMode::Unranked);
         let direct_stages = Stage::get_allowed_stages(OnlinePlayMode::Direct);
         assert_eq!(unranked_stages.contains(&Stage::FountainOfDreams), true);
+        assert_eq!(unranked_stages.into_iter().unique().collect_vec().len(), 6);
         assert_eq!(ranked_stages.contains(&Stage::FountainOfDreams), true);
+        assert_eq!(ranked_stages.into_iter().unique().collect_vec().len(), 6);
         assert_eq!(direct_stages.contains(&Stage::FountainOfDreams), true);
+        assert_eq!(direct_stages.into_iter().unique().collect_vec().len(), 6);
     }
 }
