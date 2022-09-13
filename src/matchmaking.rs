@@ -415,8 +415,8 @@ mod test {
     }
 
     #[test]
-    fn can_create_get_ticket_response_message() {
-        let _message = MatchmakingMessage::GetTicketResponse {
+    fn can_serialize_get_ticket_response_message() {
+        let message = MatchmakingMessage::GetTicketResponse {
             latest_version: String::from(LATEST_SLIPPI_CLIENT_VERSION),
             match_id: get_match_id(OnlinePlayMode::Direct),
             is_host: false,
@@ -432,6 +432,8 @@ mod test {
             }],
             stages: Stage::get_allowed_stages(OnlinePlayMode::Direct),
         };
+
+        serde_json::to_string(&message);
     }
 
     #[test]
