@@ -100,7 +100,7 @@ impl ControllerPort {
                 ControllerPort::Three,
                 ControllerPort::Four,
             ],
-            _ => vec![ControllerPort::One, ControllerPort::Two]
+            _ => vec![ControllerPort::One, ControllerPort::Two],
         }
     }
 }
