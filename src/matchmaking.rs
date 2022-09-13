@@ -105,7 +105,7 @@ impl ControllerPort {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone, Deserialize_repr, Serialize_repr)]
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone, Deserialize_repr, Serialize_repr)]
 #[repr(u8)]
 enum OnlinePlayMode {
     Ranked = 0,
