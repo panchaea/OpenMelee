@@ -56,18 +56,8 @@
             pkgs.rustc
             pkgs.rustfmt
           ] ++ pkgs.lib.optionals (system == "x86_64-linux") [
-            (ssbmPkgs.slippi-netplay.overrideAttrs (oldAttrs: rec {
-              # TODO: remove version and src after
-              # https://github.com/djanatyn/ssbm-nix/pull/27 is merged
-              version = "2.5.1";
-              src = pkgs.fetchFromGitHub {
-                owner = "project-slippi";
-                repo = "Ishiiruka";
-                rev = "v${version}";
-                sha256 = "1ha3hv2lnmjhqn3vhbca6vm3l2p2v0mp94n1lgrvjfrn827g2kbx";
-              };
-              patches = [ ./ishiiruka.patch ];
-            }))
+            (ssbmPkgs.slippi-netplay.overrideAttrs
+              (oldAttrs: rec { patches = [ ./ishiiruka.patch ]; }))
           ];
         };
 
