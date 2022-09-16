@@ -5,7 +5,7 @@ use wana_kana::utils::{is_char_hiragana, is_char_katakana};
 
 const CONNECT_CODE_SEPARATOR: &str = "#";
 const CONNECT_CODE_MAX_LENGTH: usize = 8;
-const CONNECT_CODE_TAG_VALID_PUNCTUATION: &'static [&'static char] = &[
+const CONNECT_CODE_TAG_VALID_PUNCTUATION: &[&char] = &[
     &'+', &'-', &'=', &'!', &'?', &'@', &'%', &'&', &'$', &'.', &' ', &'｡', &'､',
 ];
 
