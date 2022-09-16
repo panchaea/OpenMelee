@@ -1,10 +1,15 @@
 use std::net::{IpAddr, Ipv4Addr};
 
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use figment::{providers::Env, providers::Serialized, Figment};
 use serde::{Deserialize, Serialize};
 
 mod matchmaking;
 mod webserver;
+
+use slippi_re::establish_connection;
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Config {
@@ -35,6 +40,13 @@ async fn main() {
         .merge(Env::prefixed("SLIPPI_RE_"))
         .extract()
         .unwrap();
+
+    match establish_connection(config.database_url.clone()).run_pending_migrations(MIGRATIONS) {
+        Ok(_) => (),
+        _ => {
+            panic!("Failed to run pending migrations, exiting.")
+        }
+    }
 
     let webserver_thread = tokio::spawn(async move {
         webserver::start_server(

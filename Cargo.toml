@@ -8,7 +8,8 @@ edition = "2021"
 [dependencies]
 bson = "2.4.0"
 chrono = "0.4.22"
-diesel = { version = "2.0.0", features = ["sqlite"] }
+diesel = { version = "2.0.0", features = [ "sqlite" ] }
+diesel_migrations = { version = "2.0.0", features = [ "sqlite" ] }
 encoding_rs = "0.8.31"
 enet = "0.3.0"
 figment = { version = "0.10.7", features = [ "toml", "env" ] }
