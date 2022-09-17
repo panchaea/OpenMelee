@@ -29,7 +29,7 @@
           src = ./.;
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           nativeBuildInputs = [ pkgs.clang pkgs.cmake ];
-          buildInputs = [ pkgs.enet pkgs.sqlite ]
+          buildInputs = [ pkgs.enet pkgs.openssl pkgs.pkg-config pkgs.sqlite ]
             ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
               pkgs.darwin.apple_sdk.frameworks.Security
               pkgs.libiconv

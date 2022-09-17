@@ -24,11 +24,11 @@ struct PublicUser {
     latest_version: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CreateUserRequest {
-    display_name: String,
-    connect_code: String,
+pub struct CreateUserRequest {
+    pub display_name: String,
+    pub connect_code: String,
 }
 
 impl From<&User> for PublicUser {
@@ -98,7 +98,9 @@ pub async fn start_server(host: IpAddr, port: u16, _database_url: String) {
             }
         });
 
-    tokio::spawn(warp::serve(get_user.or(create_user)).run(socket_address))
+    let routes = get_user.or(create_user);
+
+    tokio::spawn(warp::serve(routes).run(socket_address))
         .await
         .unwrap();
 }
