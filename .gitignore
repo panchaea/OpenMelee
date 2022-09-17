@@ -2,6 +2,7 @@
 *.sqlite
 .direnv
 result
+.pre-commit-config.yaml
 
 # Added by cargo
 /target
