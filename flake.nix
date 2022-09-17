@@ -13,8 +13,13 @@
     pre-commit-hooks.inputs.flake-utils.follows = "flake-utils";
   };
 
-  outputs = { self, nixpkgs, crane, ssbm-nix, flake-utils, pre-commit-hooks, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    { self, nixpkgs, crane, ssbm-nix, flake-utils, pre-commit-hooks, ... }:
+    nixpkgs.lib.recursiveUpdate (flake-utils.lib.eachSystem [
+      "x86_64-linux"
+      "x86_64-darwin"
+      "aarch64-darwin"
+    ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         ssbmPkgs = ssbm-nix.packages.${system};
@@ -24,9 +29,10 @@
           src = ./.;
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           nativeBuildInputs = [ pkgs.clang pkgs.cmake ];
-          buildInputs =
-            [ pkgs.enet pkgs.sqlite ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-              pkgs.darwin.apple_sdk.frameworks.Security pkgs.libiconv
+          buildInputs = [ pkgs.enet pkgs.sqlite ]
+            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+              pkgs.darwin.apple_sdk.frameworks.Security
+              pkgs.libiconv
             ];
           dontUseCmakeConfigure = true;
         };
@@ -36,17 +42,15 @@
         crateBuildAttrs = _crateBuildAttrs // { inherit cargoArtifacts; };
 
         crate = craneLib.buildPackage crateBuildAttrs;
+
+        pre-commit-check = pre-commit-hooks.lib.${system}.run {
+          inherit (_crateBuildAttrs) src;
+          hooks.nixfmt.enable = true;
+        };
       in {
         devShells.default = pkgs.mkShell {
           inherit (crateBuildAttrs) LIBCLANG_PATH nativeBuildInputs;
-          inherit (pre-commit-hooks.lib.${system}.run {
-            inherit src;
-            hooks = {
-              rustfmt.enable = true;
-              clippy.enable = true;
-              cargo-check.enable = true;
-            };
-          });
+          inherit (pre-commit-check) shellHook;
           buildInputs = crateBuildAttrs.buildInputs ++ [
             pkgs.cargo
             pkgs.clippy
@@ -66,9 +70,9 @@
         apps.default = flake-utils.lib.mkApp { drv = crate; };
 
         checks = {
-          inherit crate;
+          inherit crate pre-commit-check;
           clippy = craneLib.cargoClippy crateBuildAttrs;
           formatting = craneLib.cargoFmt crateBuildAttrs;
         };
-      });
+      })) { };
 }
