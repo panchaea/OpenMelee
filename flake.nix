@@ -74,5 +74,14 @@
           clippy = craneLib.cargoClippy crateBuildAttrs;
           formatting = craneLib.cargoFmt crateBuildAttrs;
         };
-      })) { };
+      })) {
+        overlays.default = final: _prev: {
+          slippi-re = self.packages.${final.stdenv.system}.default;
+        };
+
+        nixosModules.default = {
+          nixpkgs.overlays = [ self.overlays.default ];
+          imports = [ ./module.nix ];
+        };
+      };
 }
