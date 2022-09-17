@@ -3,14 +3,17 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use wana_kana::utils::{is_char_hiragana, is_char_katakana};
 
+use crate::schema::users;
+
 const CONNECT_CODE_SEPARATOR: &str = "#";
 const CONNECT_CODE_MAX_LENGTH: usize = 8;
 const CONNECT_CODE_TAG_VALID_PUNCTUATION: &[&char] = &[
     &'+', &'-', &'=', &'!', &'?', &'@', &'%', &'&', &'$', &'.', &' ', &'｡', &'､',
 ];
 
-#[derive(Debug, PartialEq, Eq, Clone, Queryable, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Queryable, Insertable, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[diesel(table_name = users)]
 pub struct User {
     pub uid: String,
     pub play_key: String,

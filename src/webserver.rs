@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 
-use diesel::prelude::*;
-use serde::Serialize;
+use diesel::{insert_into, prelude::*};
+use serde::{Deserialize, Serialize};
 use warp::Filter;
 
 use slippi_re::{
@@ -23,6 +24,13 @@ struct PublicUser {
     latest_version: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateUserRequest {
+    display_name: String,
+    connect_code: String,
+}
+
 impl From<&User> for PublicUser {
     fn from(user: &User) -> PublicUser {
         PublicUser {
@@ -37,8 +45,9 @@ impl From<&User> for PublicUser {
     }
 }
 
-pub async fn start_server(host: IpAddr, port: u16, database_url: String) {
+pub async fn start_server(host: IpAddr, port: u16, _database_url: String) {
     let socket_address = SocketAddr::new(host, port);
+    let database_url = _database_url.clone();
 
     let get_user = warp::get()
         .and(warp::path("user"))
@@ -62,7 +71,34 @@ pub async fn start_server(host: IpAddr, port: u16, database_url: String) {
             }
         });
 
-    tokio::spawn(warp::serve(get_user).run(socket_address))
+    let create_user = warp::post()
+        .and(warp::path("user"))
+        .and(warp::body::content_length_limit(2048))
+        .and(warp::body::json::<CreateUserRequest>())
+        .map(move |req: CreateUserRequest| {
+            println!("Received create_user request");
+
+            let _user = User::new(req.display_name, req.connect_code);
+
+            match _user {
+                Some(user) => {
+                    let connection = &mut establish_connection(_database_url.clone());
+                    match insert_into(users).values(&user).execute(connection) {
+                        Ok(_) => warp::reply::json(&PublicUser::from(&user)),
+                        _ => {
+                            let res = HashMap::from([("error", "Failed to create user")]);
+                            warp::reply::json(&res)
+                        }
+                    }
+                }
+                _ => {
+                    let res = HashMap::from([("error", "Could not create user")]);
+                    warp::reply::json(&res)
+                }
+            }
+        });
+
+    tokio::spawn(warp::serve(get_user.or(create_user)).run(socket_address))
         .await
         .unwrap();
 }
