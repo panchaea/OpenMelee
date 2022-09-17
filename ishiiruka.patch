@@ -148,7 +148,7 @@ index c6e7da768..0390fd537 100644
  		url = url + "-beta";
  	}
 diff --git a/Source/Core/DolphinWX/Config/SlippiConfigPane.cpp b/Source/Core/DolphinWX/Config/SlippiConfigPane.cpp
-index b6136ce15..7c6002884 100644
+index b6136ce15..52f98c335 100644
 --- a/Source/Core/DolphinWX/Config/SlippiConfigPane.cpp
 +++ b/Source/Core/DolphinWX/Config/SlippiConfigPane.cpp
 @@ -91,6 +91,20 @@ void SlippiNetplayConfigPane::InitializeGUI()
@@ -202,7 +202,7 @@ index b6136ce15..7c6002884 100644
  
  	m_replay_enable_checkbox->SetValue(enableReplays);
  	m_replay_month_folders_checkbox->SetValue(startup_params.m_slippiReplayMonthFolders);
-@@ -193,6 +223,19 @@ void SlippiNetplayConfigPane::LoadGUIValues()
+@@ -193,6 +223,20 @@ void SlippiNetplayConfigPane::LoadGUIValues()
  		m_slippi_netplay_lan_ip_ctrl->Hide();
  	}
  
@@ -216,13 +216,14 @@ index b6136ce15..7c6002884 100644
 +		m_slippi_matchmaking_host_txt->Hide();
 +		m_slippi_user_discovery_url_ctrl->Hide();
 +		m_slippi_user_discovery_url_txt->Hide();
++		m_slippi_user_json_file_txt->Hide();
 +		m_slippi_user_json_file_picker->Hide();
 +	}
 +
  	m_reduce_timing_dispersion_checkbox->SetValue(startup_params.bReduceTimingDispersion);
  }
  
-@@ -214,6 +257,11 @@ void SlippiNetplayConfigPane::BindEvents()
+@@ -214,6 +258,11 @@ void SlippiNetplayConfigPane::BindEvents()
  	                                             this);
  	m_slippi_netplay_lan_ip_ctrl->Bind(wxEVT_TEXT, &SlippiNetplayConfigPane::OnNetplayLanIpChanged, this);
  
@@ -234,7 +235,7 @@ index b6136ce15..7c6002884 100644
  	m_reduce_timing_dispersion_checkbox->Bind(wxEVT_CHECKBOX, &SlippiNetplayConfigPane::OnReduceTimingDispersionToggle,
  	                                          this);
  }
-@@ -295,6 +343,47 @@ void SlippiNetplayConfigPane::OnNetplayLanIpChanged(wxCommandEvent &event)
+@@ -295,6 +344,47 @@ void SlippiNetplayConfigPane::OnNetplayLanIpChanged(wxCommandEvent &event)
  	SConfig::GetInstance().m_slippiLanIp = m_slippi_netplay_lan_ip_ctrl->GetValue().c_str();
  }
  
