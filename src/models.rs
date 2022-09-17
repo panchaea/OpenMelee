@@ -21,16 +21,17 @@ pub struct User {
 
 impl User {
     fn tag_is_valid(tag: &str) -> bool {
-        tag.chars().all(|c| {
-            is_char_hiragana(c)
-                || is_char_katakana(c)
-                || char::is_ascii_alphanumeric(&c)
-                || CONNECT_CODE_TAG_VALID_PUNCTUATION.contains(&&c)
-        })
+        tag.len() > 0
+            && tag.chars().all(|c| {
+                is_char_hiragana(c)
+                    || is_char_katakana(c)
+                    || char::is_ascii_alphanumeric(&c)
+                    || CONNECT_CODE_TAG_VALID_PUNCTUATION.contains(&&c)
+            })
     }
 
     fn discriminant_is_valid(discriminant: &str) -> bool {
-        discriminant.chars().all(char::is_numeric)
+        discriminant.len() > 0 && discriminant.chars().all(char::is_numeric)
     }
 
     pub fn connect_code_is_valid(connect_code: String) -> bool {
@@ -88,6 +89,12 @@ mod test {
     fn connect_code_with_invalid_punctuation_is_not_valid() {
         assert!(!User::connect_code_is_valid("!!!*#958".to_string()));
         assert!(!User::connect_code_is_valid("()''#88".to_string()));
+    }
+
+    #[test]
+    fn connect_code_with_empty_tag_or_discriminant_is_not_valid() {
+        assert!(!User::connect_code_is_valid("TEST#".to_string()));
+        assert!(!User::connect_code_is_valid("#0001".to_string()));
     }
 
     #[test]
