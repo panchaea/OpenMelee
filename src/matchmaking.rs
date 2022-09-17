@@ -195,46 +195,9 @@ pub fn start_server(host: Ipv4Addr, port: u16, max_peers: u64) {
         .expect("Could not create host");
 
     loop {
-        match host.service(1000).expect("ENet service failed") {
-            Some(Event::Connect(_)) => println!("New connection!"),
-            Some(Event::Disconnect(..)) => println!("Disconnect!"),
-            Some(Event::Receive {
-                ref packet,
-                ref mut sender,
-                ..
-            }) => {
-                let packet_data = std::str::from_utf8(packet.data()).unwrap();
-                let message: CreateTicket = serde_json::from_str(packet_data).unwrap();
-
-                println!("{:?}", packet_data);
-
-                sender.set_data(Some(message.clone()));
-
-                match message.search.mode {
-                    OnlinePlayMode::Direct => {
-                        sender
-                            .send_packet(
-                                Packet::new(
-                                    &serde_json::to_string(
-                                        &MatchmakingMessage::CreateTicketResponse {},
-                                    )
-                                    .unwrap()
-                                    .into_bytes(),
-                                    PacketMode::ReliableSequenced,
-                                )
-                                .unwrap(),
-                                ENET_CHANNEL_ID,
-                            )
-                            .unwrap();
-                    }
-                    _ => {
-                        println!("Play mode {:?} not implemented", message.search.mode);
-                        sender.disconnect_later(0);
-                    }
-                }
-            }
-            _ => (),
-        }
+        host.service(1000)
+            .expect("ENet service failed")
+            .map(handle_enet_event);
 
         let connected_peers = host
             .peers()
@@ -246,6 +209,48 @@ pub fn start_server(host: Ipv4Addr, port: u16, max_peers: u64) {
         peers_by_game_mode.into_iter().for_each(|(mode, peers)| {
             handle_matchmaking(mode, peers.collect_vec());
         });
+    }
+}
+
+fn handle_enet_event(mut event: Event<CreateTicket>) {
+    match event {
+        Event::Connect(_) => println!("New connection!"),
+        Event::Disconnect(..) => println!("Disconnect!"),
+        Event::Receive {
+            ref packet,
+            ref mut sender,
+            ..
+        } => {
+            let packet_data = std::str::from_utf8(packet.data()).unwrap();
+            let message: CreateTicket = serde_json::from_str(packet_data).unwrap();
+
+            println!("{:?}", packet_data);
+
+            sender.set_data(Some(message.clone()));
+
+            match message.search.mode {
+                OnlinePlayMode::Direct => {
+                    sender
+                        .send_packet(
+                            Packet::new(
+                                &serde_json::to_string(
+                                    &MatchmakingMessage::CreateTicketResponse {},
+                                )
+                                .unwrap()
+                                .into_bytes(),
+                                PacketMode::ReliableSequenced,
+                            )
+                            .unwrap(),
+                            ENET_CHANNEL_ID,
+                        )
+                        .unwrap();
+                }
+                _ => {
+                    println!("Play mode {:?} not implemented", message.search.mode);
+                    sender.disconnect_later(0);
+                }
+            }
+        }
     }
 }
 
