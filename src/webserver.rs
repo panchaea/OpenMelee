@@ -21,7 +21,7 @@ struct PublicUser {
     uid: String,
     display_name: String,
     connect_code: String,
-    latest_version: Option<String>,
+    latest_version: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -38,8 +38,8 @@ impl From<&User> for PublicUser {
             display_name: user.display_name.to_string(),
             connect_code: user.connect_code.to_string(),
             latest_version: match &user.latest_version {
-                Some(str) => Some(str.to_string()),
-                _ => Some(LATEST_SLIPPI_CLIENT_VERSION.to_string()),
+                Some(str) => str.to_string(),
+                _ => LATEST_SLIPPI_CLIENT_VERSION.to_string(),
             },
         }
     }
@@ -103,4 +103,30 @@ pub async fn start_server(host: IpAddr, port: u16, _database_url: String) {
     tokio::spawn(warp::serve(routes).run(socket_address))
         .await
         .unwrap();
+}
+
+#[cfg(test)]
+mod test {
+    use crate::webserver::*;
+
+    #[test]
+    fn test_can_create_public_user_from_user() {
+        let user = User {
+            uid: "1234".to_string(),
+            play_key: "5678".to_string(),
+            display_name: "test".to_string(),
+            connect_code: "TEST#001".to_string(),
+            latest_version: None,
+        };
+
+        let public_user = PublicUser::from(&user);
+
+        assert_eq!(public_user.uid, user.uid);
+        assert_eq!(public_user.display_name, user.display_name);
+        assert_eq!(public_user.connect_code, user.connect_code);
+        assert_eq!(
+            public_user.latest_version,
+            LATEST_SLIPPI_CLIENT_VERSION.to_string()
+        );
+    }
 }
