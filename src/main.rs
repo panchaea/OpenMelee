@@ -61,13 +61,6 @@ async fn main() {
         .extract()
         .unwrap();
 
-    match establish_connection(config.database_url.clone()).run_pending_migrations(MIGRATIONS) {
-        Ok(_) => (),
-        _ => {
-            panic!("Failed to run pending migrations, exiting.")
-        }
-    }
-
     let cli = Cli::parse();
 
     match &cli.command {
@@ -92,6 +85,15 @@ async fn main() {
             }
         }
         None => {
+            match establish_connection(config.database_url.clone())
+                .run_pending_migrations(MIGRATIONS)
+            {
+                Ok(_) => (),
+                _ => {
+                    panic!("Failed to run pending migrations, exiting.")
+                }
+            }
+
             let webserver_thread = tokio::spawn(async move {
                 webserver::start_server(
                     config.webserver_address,
