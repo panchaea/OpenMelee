@@ -53,7 +53,6 @@
           inherit (pre-commit-check) shellHook;
           buildInputs = crateBuildAttrs.buildInputs ++ [
             pkgs.cargo
-            pkgs.cargo-tarpaulin
             pkgs.clippy
             pkgs.diesel-cli
             pkgs.nixfmt
@@ -61,6 +60,7 @@
             pkgs.rustc
             pkgs.rustfmt
           ] ++ pkgs.lib.optionals (system == "x86_64-linux") [
+            pkgs.cargo-tarpaulin
             (ssbmPkgs.slippi-netplay.overrideAttrs
               (oldAttrs: rec { patches = [ ./ishiiruka.patch ]; }))
           ];
