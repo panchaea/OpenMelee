@@ -24,7 +24,7 @@ pub struct User {
 
 impl User {
     fn tag_is_valid(tag: &str) -> bool {
-        tag.len() > 0
+        !tag.is_empty()
             && tag.chars().all(|c| {
                 is_char_hiragana(c)
                     || is_char_katakana(c)
@@ -34,7 +34,7 @@ impl User {
     }
 
     fn discriminant_is_valid(discriminant: &str) -> bool {
-        discriminant.len() > 0 && discriminant.chars().all(char::is_numeric)
+        !discriminant.is_empty() && discriminant.chars().all(char::is_numeric)
     }
 
     pub fn connect_code_is_valid(connect_code: String) -> bool {
