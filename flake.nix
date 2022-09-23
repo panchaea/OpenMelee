@@ -53,6 +53,7 @@
           inherit (pre-commit-check) shellHook;
           buildInputs = crateBuildAttrs.buildInputs ++ [
             pkgs.cargo
+            pkgs.cargo-watch
             pkgs.clippy
             pkgs.diesel-cli
             pkgs.nixfmt
