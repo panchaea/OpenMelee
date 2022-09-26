@@ -28,7 +28,7 @@ impl UserNotFound {
 }
 
 impl IntoResponse for UserNotFound {
-    fn into_response(self: Self) -> Response {
+    fn into_response(self) -> Response {
         (StatusCode::OK, Json(self)).into_response()
     }
 }
@@ -43,7 +43,7 @@ struct PublicUser {
 }
 
 impl IntoResponse for PublicUser {
-    fn into_response(self: Self) -> Response {
+    fn into_response(self) -> Response {
         (StatusCode::OK, Json(self)).into_response()
     }
 }
@@ -90,7 +90,6 @@ async fn create_user(
     .map(|user| PublicUser::from(&user))
     .map_err(|err| {
         println!("{:?}", err);
-        ()
     })
 }
 

@@ -25,7 +25,7 @@ pub struct User {
 }
 
 impl IntoResponse for User {
-    fn into_response(self: Self) -> Response {
+    fn into_response(self) -> Response {
         (StatusCode::OK, Json(self)).into_response()
     }
 }
