@@ -68,23 +68,16 @@ async fn main() {
                 }
             }
 
+            let webserver_config = config.clone();
             let webserver_thread = tokio::spawn(async move {
-                webserver::start_server(
-                    config.webserver_address,
-                    config.webserver_port,
-                    config.database_url,
-                )
-                .await;
+                webserver::start_server(webserver_config).await;
             });
 
             println!("Started webserver");
 
+            let enet_server_config = config.clone();
             let enet_server_thread = tokio::task::spawn_blocking(move || {
-                matchmaking::start_server(
-                    config.matchmaking_server_address,
-                    config.matchmaking_port,
-                    config.matchmaking_max_peers,
-                );
+                matchmaking::start_server(enet_server_config);
             });
 
             println!("Started matchmaking server");

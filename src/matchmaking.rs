@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::fmt;
-use std::net::Ipv4Addr;
 
 use chrono::Utc;
 use encoding_rs::SHIFT_JIS;
@@ -11,7 +10,7 @@ use serde::{de, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use unicode_normalization::UnicodeNormalization;
 
-use slippi_re::LATEST_SLIPPI_CLIENT_VERSION;
+use slippi_re::{Config, LATEST_SLIPPI_CLIENT_VERSION};
 
 const ENET_CHANNEL_ID: u8 = 0;
 
@@ -181,13 +180,13 @@ enum MatchmakingMessage {
     },
 }
 
-pub fn start_server(host: Ipv4Addr, port: u16, max_peers: u64) {
+pub fn start_server(config: Config) {
     let enet = Enet::new().expect("Could not initialize ENet");
-    let listen_address = Address::new(host, port);
+    let listen_address = Address::new(config.matchmaking_server_address, config.matchmaking_port);
     let mut host = enet
         .create_host::<CreateTicket>(
             Some(&listen_address),
-            max_peers,
+            config.matchmaking_max_peers,
             ChannelLimit::Maximum,
             BandwidthLimit::Unlimited,
             BandwidthLimit::Unlimited,

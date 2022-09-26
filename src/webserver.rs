@@ -1,12 +1,12 @@
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 
 use diesel::{insert_into, prelude::*};
 use serde::{Deserialize, Serialize};
 use warp::Filter;
 
 use slippi_re::{
-    establish_connection, models::*, schema::users::dsl::*, LATEST_SLIPPI_CLIENT_VERSION,
+    establish_connection, models::*, schema::users::dsl::*, Config, LATEST_SLIPPI_CLIENT_VERSION,
 };
 
 #[derive(Serialize)]
@@ -45,9 +45,10 @@ impl From<&User> for PublicUser {
     }
 }
 
-pub async fn start_server(host: IpAddr, port: u16, _database_url: String) {
-    let socket_address = SocketAddr::new(host, port);
-    let database_url = _database_url.clone();
+pub async fn start_server(config: Config) {
+    let socket_address = SocketAddr::new(config.webserver_address, config.webserver_port);
+    let database_url = config.database_url;
+    let _database_url = database_url.clone();
 
     let get_user = warp::get()
         .and(warp::path("user"))

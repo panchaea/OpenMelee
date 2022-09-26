@@ -16,7 +16,7 @@ pub fn establish_connection(database_url: String) -> SqliteConnection {
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub webserver_address: IpAddr,
     pub webserver_port: u16,
