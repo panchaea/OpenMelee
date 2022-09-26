@@ -13,7 +13,7 @@ use sqlx::{Sqlite, SqlitePool};
 
 use slippi_re::{models::*, Config, LATEST_SLIPPI_CLIENT_VERSION};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct UserNotFound {
     latest_version: String,
@@ -33,7 +33,7 @@ impl IntoResponse for UserNotFound {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PublicUser {
     uid: String,
@@ -93,17 +93,19 @@ async fn create_user(
     })
 }
 
-pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
-    let app = Router::new()
+async fn app(pool: SqlitePool) -> Router {
+    Router::new()
         .route("/user", post(create_user))
         .route("/user/:uid", get(get_user))
-        .layer(axum_sqlx_tx::Layer::new(pool));
+        .layer(axum_sqlx_tx::Layer::new(pool))
+}
 
+pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
     let server = axum::Server::bind(&SocketAddr::from((
         config.webserver_address,
         config.webserver_port,
     )))
-    .serve(app.into_make_service());
+    .serve(app(pool).await.into_make_service());
 
     println!(
         "Web server listening on http://{}:{}",
@@ -115,6 +117,10 @@ pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
 
 #[cfg(test)]
 mod test {
+    use std::net::TcpListener;
+
+    use sqlx::Pool;
+
     use crate::webserver::*;
 
     #[test]
@@ -136,5 +142,42 @@ mod test {
             public_user.latest_version,
             LATEST_SLIPPI_CLIENT_VERSION.to_string()
         );
+    }
+
+    #[sqlx::test]
+    async fn can_create_user(pool: Pool<Sqlite>) {
+        let config = Config::default();
+        let addr = format!("{}:{}", config.webserver_address, config.webserver_port);
+        let listener = TcpListener::bind(addr.parse::<SocketAddr>().unwrap()).unwrap();
+
+        tokio::spawn(async move {
+            axum::Server::from_tcp(listener)
+                .unwrap()
+                .serve(app(pool).await.into_make_service())
+                .await
+                .unwrap();
+        });
+
+        let client = reqwest::Client::new();
+
+        let create_user_response = client
+            .post(format!("http://{}/user", addr))
+            .form(&UserForm {
+                display_name: "test".to_string(),
+                connect_code: "TEST#001".to_string(),
+            })
+            .send()
+            .await;
+
+        assert!(create_user_response.is_ok());
+
+        let created_user = create_user_response
+            .unwrap()
+            .json::<PublicUser>()
+            .await
+            .expect("Could not convert create_user response to JSON");
+
+        assert_eq!(created_user.display_name, "test".to_string());
+        assert_eq!(created_user.connect_code, "TEST#001".to_string());
     }
 }

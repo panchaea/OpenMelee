@@ -43,7 +43,7 @@ async fn main() {
             let client = reqwest::Client::new();
             let res = client
                 .post(format!("http://{}/user", server))
-                .json(&webserver::UserForm {
+                .form(&webserver::UserForm {
                     display_name: display_name.to_string(),
                     connect_code: connect_code.to_string(),
                 })
