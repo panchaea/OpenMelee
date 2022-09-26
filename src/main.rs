@@ -1,26 +1,13 @@
-use std::net::{IpAddr, Ipv4Addr};
-
 use clap::{Parser, Subcommand};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use figment::{providers::Env, providers::Serialized, Figment};
-use serde::{Deserialize, Serialize};
 
 mod matchmaking;
 mod webserver;
 
-use slippi_re::establish_connection;
+use slippi_re::{establish_connection, Config};
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Config {
-    webserver_address: IpAddr,
-    webserver_port: u16,
-    matchmaking_server_address: Ipv4Addr,
-    matchmaking_port: u16,
-    matchmaking_max_peers: u64,
-    database_url: String,
-}
 
 #[derive(Parser)]
 #[clap()]
@@ -39,19 +26,6 @@ enum Commands {
         #[clap(value_parser)]
         connect_code: String,
     },
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            webserver_address: IpAddr::V4(Ipv4Addr::LOCALHOST),
-            webserver_port: 5000,
-            matchmaking_server_address: Ipv4Addr::LOCALHOST,
-            matchmaking_port: 43113,
-            matchmaking_max_peers: 1024,
-            database_url: "slippi-re.sqlite".to_string(),
-        }
-    }
 }
 
 #[tokio::main]
