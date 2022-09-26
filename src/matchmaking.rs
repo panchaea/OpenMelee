@@ -8,6 +8,7 @@ use itertools::Itertools;
 use rand::{seq::IteratorRandom, seq::SliceRandom, thread_rng};
 use serde::{de, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use sqlx::SqlitePool;
 use unicode_normalization::UnicodeNormalization;
 
 use slippi_re::{Config, LATEST_SLIPPI_CLIENT_VERSION};
@@ -180,7 +181,7 @@ enum MatchmakingMessage {
     },
 }
 
-pub fn start_server(config: Config) {
+pub fn start_server(config: Config, _pool: SqlitePool) {
     let enet = Enet::new().expect("Could not initialize ENet");
     let listen_address = Address::new(config.matchmaking_server_address, config.matchmaking_port);
     let mut host = enet
@@ -191,7 +192,12 @@ pub fn start_server(config: Config) {
             BandwidthLimit::Unlimited,
             BandwidthLimit::Unlimited,
         )
-        .expect("Could not create host");
+        .expect("Could not create ENet host");
+
+    println!(
+        "Matchmaking server listening on udp://{}:{}",
+        config.matchmaking_server_address, config.matchmaking_port
+    );
 
     loop {
         host.service(1000)
@@ -357,6 +363,7 @@ fn create_game(
 mod test {
     use std::collections::hash_map::Entry::{Occupied, Vacant};
     use std::collections::HashMap;
+    use std::net::Ipv4Addr;
 
     use rand::Rng;
 

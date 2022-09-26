@@ -55,11 +55,11 @@
             pkgs.cargo
             pkgs.cargo-watch
             pkgs.clippy
-            pkgs.diesel-cli
             pkgs.nixfmt
             pkgs.rust-analyzer
             pkgs.rustc
             pkgs.rustfmt
+            pkgs.sqlx-cli
           ] ++ pkgs.lib.optionals (system == "x86_64-linux") [
             pkgs.cargo-tarpaulin
             (ssbmPkgs.slippi-netplay.overrideAttrs

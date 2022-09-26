@@ -1,13 +1,10 @@
 use clap::{Parser, Subcommand};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use figment::{providers::Env, providers::Serialized, Figment};
 
 mod matchmaking;
 mod webserver;
 
-use slippi_re::{establish_connection, Config};
-
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+use slippi_re::{init_pool, run_migrations, Config};
 
 #[derive(Parser)]
 #[clap()]
@@ -46,7 +43,7 @@ async fn main() {
             let client = reqwest::Client::new();
             let res = client
                 .post(format!("http://{}/user", server))
-                .json(&webserver::CreateUserRequest {
+                .json(&webserver::UserForm {
                     display_name: display_name.to_string(),
                     connect_code: connect_code.to_string(),
                 })
@@ -59,33 +56,21 @@ async fn main() {
             }
         }
         None => {
-            match establish_connection(config.database_url.clone())
-                .run_pending_migrations(MIGRATIONS)
-            {
-                Ok(_) => (),
-                _ => {
-                    panic!("Failed to run pending migrations, exiting.")
-                }
-            }
+            let pool = init_pool(config.clone()).await;
 
-            let webserver_config = config.clone();
-            let webserver_thread = tokio::spawn(async move {
-                webserver::start_server(webserver_config).await;
-            });
+            run_migrations(&pool).await;
 
-            println!("Started webserver");
+            let webserver_thread =
+                tokio::spawn(webserver::start_server(config.clone(), pool.clone()));
 
-            let enet_server_config = config.clone();
             let enet_server_thread = tokio::task::spawn_blocking(move || {
-                matchmaking::start_server(enet_server_config);
+                matchmaking::start_server(config.clone(), pool.clone());
             });
 
-            println!("Started matchmaking server");
-
-            if (webserver_thread.await).is_err() {
+            if webserver_thread.await.is_err() {
                 println!("webserver thread exited abnormally")
             }
-            if (enet_server_thread.await).is_err() {
+            if enet_server_thread.await.is_err() {
                 println!("ENet server thread exited abnormally")
             }
         }

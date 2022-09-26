@@ -6,11 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum = "0.5.16"
+axum-sqlx-tx = { version = "0.4.0", features = [ "sqlite", "runtime-tokio-native-tls" ] }
 bson = "2.4.0"
 chrono = "0.4.22"
 clap = { version = "3.2.22", features = [ "derive" ] }
-diesel = { version = "2.0.0", features = [ "sqlite" ] }
-diesel_migrations = { version = "2.0.0", features = [ "sqlite" ] }
 encoding_rs = "0.8.31"
 enet = "0.3.0"
 figment = { version = "0.10.7", features = [ "toml", "env" ] }
@@ -20,10 +20,10 @@ reqwest = { version = "0.11.11", features = [ "json" ] }
 serde = { version = "1.0.144", features = [ "derive" ] }
 serde_json = "1.0.85"
 serde_repr = "0.1.9"
+sqlx = { version = "0.6.2", features = [ "sqlite", "runtime-tokio-native-tls" ] }
 tokio = { version = "1.21.0", features = [ "full" ] }
 unicode-normalization = "0.1.21"
 wana_kana = "2.1.0"
-warp = "0.3.2"
 
 [[bin]]
 name = "slippi-re"

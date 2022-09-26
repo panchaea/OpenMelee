@@ -1,18 +1,36 @@
-use std::collections::HashMap;
 use std::net::SocketAddr;
 
-use diesel::{insert_into, prelude::*};
-use serde::{Deserialize, Serialize};
-use warp::Filter;
-
-use slippi_re::{
-    establish_connection, models::*, schema::users::dsl::*, Config, LATEST_SLIPPI_CLIENT_VERSION,
+use axum::{
+    extract::Path,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::{get, post},
+    Form, Json, Router,
 };
+use axum_sqlx_tx::Tx;
+use serde::{Deserialize, Serialize};
+use sqlx::{Sqlite, SqlitePool};
+
+use slippi_re::{models::*, Config, LATEST_SLIPPI_CLIENT_VERSION};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct UserNotFound {
     latest_version: String,
+}
+
+impl UserNotFound {
+    fn new() -> UserNotFound {
+        UserNotFound {
+            latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
+        }
+    }
+}
+
+impl IntoResponse for UserNotFound {
+    fn into_response(self: Self) -> Response {
+        (StatusCode::OK, Json(self)).into_response()
+    }
 }
 
 #[derive(Serialize)]
@@ -24,9 +42,15 @@ struct PublicUser {
     latest_version: String,
 }
 
-#[derive(Serialize, Deserialize)]
+impl IntoResponse for PublicUser {
+    fn into_response(self: Self) -> Response {
+        (StatusCode::OK, Json(self)).into_response()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateUserRequest {
+pub struct UserForm {
     pub display_name: String,
     pub connect_code: String,
 }
@@ -45,65 +69,49 @@ impl From<&User> for PublicUser {
     }
 }
 
-pub async fn start_server(config: Config) {
-    let socket_address = SocketAddr::new(config.webserver_address, config.webserver_port);
-    let database_url = config.database_url;
-    let _database_url = database_url.clone();
-
-    let get_user = warp::get()
-        .and(warp::path("user"))
-        .and(warp::path::param::<String>())
-        .map(move |_uid: String| {
-            println!("Received get_user request");
-
-            let connection = &mut establish_connection(database_url.clone());
-
-            let _users = users
-                .filter(uid.eq(_uid))
-                .limit(1)
-                .load::<User>(connection)
-                .expect("Error connecting to database");
-
-            match _users.get(0) {
-                Some(user) => warp::reply::json(&PublicUser::from(user)),
-                _ => warp::reply::json(&UserNotFound {
-                    latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
-                }),
-            }
-        });
-
-    let create_user = warp::post()
-        .and(warp::path("user"))
-        .and(warp::body::content_length_limit(2048))
-        .and(warp::body::json::<CreateUserRequest>())
-        .map(move |req: CreateUserRequest| {
-            println!("Received create_user request");
-
-            let _user = User::new(req.display_name, req.connect_code);
-
-            match _user {
-                Some(user) => {
-                    let connection = &mut establish_connection(_database_url.clone());
-                    match insert_into(users).values(&user).execute(connection) {
-                        Ok(_) => warp::reply::json(&PublicUser::from(&user)),
-                        _ => {
-                            let res = HashMap::from([("error", "Failed to create user")]);
-                            warp::reply::json(&res)
-                        }
-                    }
-                }
-                _ => {
-                    let res = HashMap::from([("error", "Could not create user")]);
-                    warp::reply::json(&res)
-                }
-            }
-        });
-
-    let routes = get_user.or(create_user);
-
-    tokio::spawn(warp::serve(routes).run(socket_address))
+async fn get_user(mut tx: Tx<Sqlite>, Path(uid): Path<String>) -> Result<PublicUser, UserNotFound> {
+    User::get(&mut tx, uid)
         .await
-        .unwrap();
+        .map(|user| PublicUser::from(&user))
+        .map_err(|_| UserNotFound::new())
+}
+
+async fn create_user(
+    mut tx: Tx<Sqlite>,
+    Form(user_form): Form<UserForm>,
+) -> Result<PublicUser, ()> {
+    println!("Received create_user request");
+    User::create(
+        &mut tx,
+        user_form.display_name.to_string(),
+        user_form.connect_code.to_string(),
+    )
+    .await
+    .map(|user| PublicUser::from(&user))
+    .map_err(|err| {
+        println!("{:?}", err);
+        ()
+    })
+}
+
+pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
+    let app = Router::new()
+        .route("/user", post(create_user))
+        .route("/user/:uid", get(get_user))
+        .layer(axum_sqlx_tx::Layer::new(pool));
+
+    let server = axum::Server::bind(&SocketAddr::from((
+        config.webserver_address,
+        config.webserver_port,
+    )))
+    .serve(app.into_make_service());
+
+    println!(
+        "Web server listening on http://{}:{}",
+        config.webserver_address, config.webserver_port
+    );
+
+    server.await.map_err(|_| ())
 }
 
 #[cfg(test)]
