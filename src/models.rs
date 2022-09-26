@@ -108,8 +108,9 @@ impl User {
 #[cfg(test)]
 mod test {
     use bson::{oid::ObjectId, Uuid};
+    use sqlx::{Pool, Sqlite};
 
-    use crate::{init_pool, models::*, run_migrations, Config};
+    use crate::models::*;
 
     #[test]
     fn connect_code_with_katakana_is_valid() {
@@ -184,14 +185,8 @@ mod test {
         assert!(user_3.is_none());
     }
 
-    #[tokio::test]
-    async fn can_create_user_and_get_by_uid() {
-        let mut config: Config = Config::default();
-        config.database_url = "sqlite::memory:".to_string();
-
-        let pool = init_pool(config).await;
-        run_migrations(&pool).await;
-
+    #[sqlx::test]
+    async fn can_create_user_and_get_by_uid(pool: Pool<Sqlite>) {
         let user = User::create(&pool, "test".to_string(), "TEST#001".to_string())
             .await
             .expect("Could not create user");
