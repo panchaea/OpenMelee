@@ -11,6 +11,7 @@ use axum::{
 };
 use axum_sqlx_tx::Tx;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::{Sqlite, SqlitePool};
 use tera::{Context, Tera};
 
@@ -89,10 +90,7 @@ async fn get_user(mut tx: Tx<Sqlite>, Path(uid): Path<String>) -> Result<PublicU
         .map_err(|_| UserNotFound::new())
 }
 
-async fn create_user(
-    mut tx: Tx<Sqlite>,
-    Form(user_form): Form<UserForm>,
-) -> Result<PublicUser, ()> {
+async fn create_user(mut tx: Tx<Sqlite>, Form(user_form): Form<UserForm>) -> impl IntoResponse {
     println!("Received create_user request");
     User::create(
         &mut tx,
@@ -101,8 +99,12 @@ async fn create_user(
     )
     .await
     .map(|user| PublicUser::from(&user))
-    .map_err(|err| {
-        println!("{:?}", err);
+    .map_err(|errs| {
+        let body = json!({ "errors": errs
+            .iter()
+            .map(|err| err.to_string())
+            .collect::<Vec<String>>() });
+        (StatusCode::BAD_REQUEST, body.to_string())
     })
 }
 
@@ -243,6 +245,46 @@ mod test {
 
         assert_eq!(created_user.display_name, "test".to_string());
         assert_eq!(created_user.connect_code, "TEST#001".to_string());
+    }
+
+    #[sqlx::test]
+    async fn cannot_create_user_with_errors(pool: Pool<Sqlite>) {
+        let config = Config::default();
+        let addr = format!("{}:{}", config.webserver_address, config.webserver_port + 1);
+        let listener = TcpListener::bind(addr.parse::<SocketAddr>().unwrap()).unwrap();
+
+        tokio::spawn(async move {
+            axum::Server::from_tcp(listener)
+                .unwrap()
+                .serve(app(pool).await.into_make_service())
+                .await
+                .unwrap();
+        });
+
+        let client = reqwest::Client::new();
+
+        let create_user_response = client
+            .post(format!("http://{}/user", addr))
+            .form(&UserForm {
+                display_name: "".to_string(),
+                connect_code: "TEST#".to_string(),
+            })
+            .send()
+            .await;
+
+        let res: serde_json::Value =
+            serde_json::from_str(&create_user_response.unwrap().text().await.unwrap()).unwrap();
+
+        assert_eq!(
+            res,
+            json!({
+                "errors":
+                    vec![
+                        CreateUserError::InvalidConnectCode.to_string(),
+                        CreateUserError::InvalidDisplayName.to_string(),
+                    ]
+            })
+        );
     }
 
     #[test]

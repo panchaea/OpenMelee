@@ -31,14 +31,17 @@ impl IntoResponse for User {
 }
 
 impl User {
+    fn is_displayable(s: &str) -> bool {
+        s.chars().all(|c| {
+            is_char_hiragana(c)
+                || is_char_katakana(c)
+                || char::is_ascii_alphanumeric(&c)
+                || CONNECT_CODE_TAG_VALID_PUNCTUATION.contains(&&c)
+        })
+    }
+
     fn tag_is_valid(tag: &str) -> bool {
-        !tag.is_empty()
-            && tag.chars().all(|c| {
-                is_char_hiragana(c)
-                    || is_char_katakana(c)
-                    || char::is_ascii_alphanumeric(&c)
-                    || CONNECT_CODE_TAG_VALID_PUNCTUATION.contains(&&c)
-            })
+        !tag.is_empty() && Self::is_displayable(tag)
     }
 
     fn discriminant_is_valid(discriminant: &str) -> bool {
@@ -58,18 +61,34 @@ impl User {
         };
     }
 
-    pub fn new(display_name: String, connect_code: String) -> Option<User> {
-        if Self::connect_code_is_valid(connect_code.clone()) && !display_name.is_empty() {
-            Some(User {
+    pub fn display_name_is_valid(display_name: String) -> bool {
+        !display_name.is_empty() && Self::is_displayable(&display_name)
+    }
+
+    pub fn new(display_name: String, connect_code: String) -> Result<User, Vec<CreateUserError>> {
+        let connect_code_valid = Self::connect_code_is_valid(connect_code.clone());
+        let display_name_valid = Self::display_name_is_valid(display_name.clone());
+        let mut errors = vec![];
+
+        if connect_code_valid && display_name_valid {
+            return Ok(User {
                 uid: format!("{}", Uuid::new()),
                 play_key: ObjectId::new().to_hex(),
                 display_name,
                 connect_code,
                 latest_version: None,
-            })
-        } else {
-            None
+            });
         }
+
+        if !connect_code_valid {
+            errors.push(CreateUserError::InvalidConnectCode);
+        }
+
+        if !display_name_valid {
+            errors.push(CreateUserError::InvalidDisplayName);
+        }
+
+        Err(errors)
     }
 
     pub async fn get<'a, T: SqliteExecutor<'a>>(
@@ -86,9 +105,9 @@ impl User {
         executor: T,
         display_name: String,
         connect_code: String,
-    ) -> Result<User, sqlx::Error> {
+    ) -> Result<User, Vec<CreateUserError>> {
         match Self::new(display_name, connect_code) {
-            Some(user) => {
+            Ok(user) => {
                 let _user = user.clone();
                 sqlx::query("insert into users (uid, play_key, display_name, connect_code, latest_version) values ($1, $2, $3, $4, $5)")
                     .bind(user.uid)
@@ -99,9 +118,28 @@ impl User {
                     .execute(executor)
                     .await
                     .map(|_| _user)
+                    .map_err(|_| vec![CreateUserError::DuplicateConnectCode])
             }
-            None => Err(sqlx::Error::RowNotFound),
+            Err(errors) => Err(errors),
         }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum CreateUserError {
+    DuplicateConnectCode,
+    InvalidConnectCode,
+    InvalidDisplayName,
+}
+
+impl ToString for CreateUserError {
+    fn to_string(&self) -> String {
+        match self {
+            CreateUserError::DuplicateConnectCode => "Connect code is already in use",
+            CreateUserError::InvalidConnectCode => "Connect code is not valid",
+            CreateUserError::InvalidDisplayName => "Display name is not valid",
+        }
+        .to_string()
     }
 }
 
@@ -144,7 +182,7 @@ mod test {
     #[test]
     fn can_instantiate_user_with_display_name_and_valid_connect_code() {
         let user = User::new("test".to_string(), "TEST#001".to_string());
-        assert!(user.is_some());
+        assert!(user.is_ok());
         assert!(ObjectId::parse_str(user.clone().unwrap().play_key).is_ok());
         assert!(Uuid::parse_str(user.clone().unwrap().uid).is_ok());
         assert_eq!(user.clone().unwrap().display_name, "test");
@@ -154,15 +192,15 @@ mod test {
     #[test]
     fn cannot_instantiate_user_with_empty_display_name() {
         let user = User::new("".to_string(), "TEST#001".to_string());
-        assert!(user.is_none());
+        assert!(user.is_err());
     }
 
     #[test]
     fn cannot_instantiate_user_with_invalid_connect_code_id() {
         let user_1 = User::new("test".to_string(), "TE❤T#000".to_string());
         let user_2 = User::new("test".to_string(), "TESTZ#000".to_string());
-        assert!(user_1.is_none());
-        assert!(user_2.is_none());
+        assert!(user_1.is_err());
+        assert!(user_2.is_err());
     }
 
     #[test]
@@ -170,9 +208,9 @@ mod test {
         let user_1 = User::new("test".to_string(), "TEST#00A".to_string());
         let user_2 = User::new("test".to_string(), "TEST##00".to_string());
         let user_3 = User::new("test".to_string(), "TEST#0001".to_string());
-        assert!(user_1.is_none());
-        assert!(user_2.is_none());
-        assert!(user_3.is_none());
+        assert!(user_1.is_err());
+        assert!(user_2.is_err());
+        assert!(user_3.is_err());
     }
 
     #[test]
@@ -180,9 +218,9 @@ mod test {
         let user_1 = User::new("test".to_string(), "TEST/001".to_string());
         let user_2 = User::new("test".to_string(), "TEST?001".to_string());
         let user_3 = User::new("test".to_string(), "TEST'001".to_string());
-        assert!(user_1.is_none());
-        assert!(user_2.is_none());
-        assert!(user_3.is_none());
+        assert!(user_1.is_err());
+        assert!(user_2.is_err());
+        assert!(user_3.is_err());
     }
 
     #[sqlx::test]
