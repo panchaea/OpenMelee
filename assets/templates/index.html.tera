@@ -4,7 +4,7 @@
 {% include "navbar.html.tera" %}
 <h1>slippi-re</h1>
 <h3>
-  An open source, self-hostable, Slippi compatible* Melee matchmaking server. Currently in <strong>alpha</strong>.
+  An open source, self-hostable, Slippi compatible* Melee matchmaking server. <em>Currently in alpha</em>.
 </h3>
 <hr/>
 <p>
