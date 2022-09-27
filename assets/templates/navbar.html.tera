@@ -1,0 +1,6 @@
+<nav class="navbar">
+  <ol>
+    <li class="navbar-item"><a href="/">Home</a></li>
+  </ol>
+</nav>
+<hr/>

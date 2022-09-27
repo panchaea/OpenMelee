@@ -1,17 +1,20 @@
 use std::net::SocketAddr;
 
 use axum::{
+    body::{boxed, Full},
     extract::Path,
-    http::StatusCode,
-    response::{IntoResponse, Response},
+    handler::Handler,
+    http::{header, StatusCode, Uri},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
-    Form, Json, Router,
+    Extension, Form, Json, Router,
 };
 use axum_sqlx_tx::Tx;
 use serde::{Deserialize, Serialize};
 use sqlx::{Sqlite, SqlitePool};
+use tera::{Context, Tera};
 
-use slippi_re::{models::*, Config, LATEST_SLIPPI_CLIENT_VERSION};
+use slippi_re::{models::*, Asset, Config, LATEST_SLIPPI_CLIENT_VERSION};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -69,6 +72,16 @@ impl From<&User> for PublicUser {
     }
 }
 
+async fn index(Extension(tera): Extension<Tera>) -> Html<String> {
+    let content = tera.render("index.html.tera", &Context::new()).unwrap();
+    Html(content)
+}
+
+async fn not_found(Extension(tera): Extension<Tera>) -> Html<String> {
+    let content = tera.render("404.html.tera", &Context::new()).unwrap();
+    Html(content)
+}
+
 async fn get_user(mut tx: Tx<Sqlite>, Path(uid): Path<String>) -> Result<PublicUser, UserNotFound> {
     User::get(&mut tx, uid)
         .await
@@ -93,11 +106,62 @@ async fn create_user(
     })
 }
 
+async fn static_handler(uri: Uri) -> impl IntoResponse {
+    let path = uri.path().trim_start_matches('/').to_string();
+
+    match Asset::get(path.as_str()) {
+        Some(content) => {
+            let body = boxed(Full::from(content.data));
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            Response::builder()
+                .header(header::CONTENT_TYPE, mime.as_ref())
+                .body(body)
+                .unwrap()
+        }
+        None => Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(boxed(Full::from("Not Found")))
+            .unwrap(),
+    }
+}
+
+fn load_templates() -> Tera {
+    let templates = Asset::iter()
+        .into_iter()
+        .filter(|asset_path| asset_path.ends_with(".tera"))
+        .map(move |asset_path| {
+            let _asset_path = asset_path.clone();
+            let asset = Asset::get(&_asset_path).unwrap();
+            let contents = std::str::from_utf8(asset.data.as_ref()).unwrap();
+
+            (
+                std::path::Path::new(&asset_path.to_string())
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                contents.to_string(),
+            )
+        });
+
+    let mut tera = Tera::new("assets/templates/*.tera").expect("Failed to read templates");
+
+    tera.add_raw_templates(templates)
+        .expect("Failed to parse templates");
+
+    tera
+}
+
 async fn app(pool: SqlitePool) -> Router {
     Router::new()
+        .route("/", get(index))
         .route("/user", post(create_user))
         .route("/user/:uid", get(get_user))
+        .route("/static/*file", static_handler.into_service())
+        .fallback(get(not_found))
         .layer(axum_sqlx_tx::Layer::new(pool))
+        .layer(Extension(load_templates()))
 }
 
 pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
@@ -179,5 +243,11 @@ mod test {
 
         assert_eq!(created_user.display_name, "test".to_string());
         assert_eq!(created_user.connect_code, "TEST#001".to_string());
+    }
+
+    #[test]
+    fn can_render_index() {
+        let tera = load_templates();
+        assert!(tera.render("index.html.tera", &Context::new()).is_ok());
     }
 }

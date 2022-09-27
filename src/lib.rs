@@ -1,6 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::str::FromStr;
 
+use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
@@ -33,6 +34,10 @@ impl Default for Config {
         }
     }
 }
+
+#[derive(RustEmbed)]
+#[folder = "assets"]
+pub struct Asset;
 
 pub async fn init_pool(config: Config) -> SqlitePool {
     let connection_options = SqliteConnectOptions::from_str(&config.database_url.clone())

@@ -1,0 +1,9 @@
+{% extends "base.html.tera" %}
+{% block title %}slippi-re{% endblock title %}
+{% block content %}
+{% include "navbar.html.tera" %}
+<h1>Not Found</h1>
+<p>
+  Whatever you're looking for, it isn't here.
+</p>
+{% endblock content %}

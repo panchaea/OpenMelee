@@ -1,0 +1,33 @@
+html {
+    font-size: 1.1em;
+}
+
+.container {
+    max-width: 800px;
+    min-width: 800px;
+    margin: 0 auto;
+    padding: 20px 10px;
+}
+
+.navbar > ol {
+    list-style-type: none;
+    padding-left: 0;
+    display: flex;
+}
+
+.navbar-spacer {
+    flex-grow: 1;
+}
+
+.navbar-item {
+    display: inline-block;
+    padding: 0em 0.5em;
+}
+
+ol > .navbar-item:first-child {
+    padding-left: 0px;
+}
+
+ol > .navbar-item:last-child {
+    padding-right: 0px;
+}
