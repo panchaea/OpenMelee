@@ -99,11 +99,8 @@ async fn create_user(mut tx: Tx<Sqlite>, Form(user_form): Form<UserForm>) -> imp
     )
     .await
     .map(|user| PublicUser::from(&user))
-    .map_err(|errs| {
-        let body = json!({ "errors": errs
-            .iter()
-            .map(|err| err.to_string())
-            .collect::<Vec<String>>() });
+    .map_err(|errors| {
+        let body = json!({ "errors": errors });
         (StatusCode::BAD_REQUEST, body.to_string())
     })
 }
@@ -247,6 +244,20 @@ mod test {
         assert_eq!(created_user.connect_code, "TEST#001".to_string());
     }
 
+    fn extract_errors<'a>(res: &'a serde_json::Value, field: &str) -> Vec<&'a str> {
+        let error_codes = res
+            .get("errors")
+            .unwrap()
+            .get(field)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .into_iter()
+            .map(|err| err.get("code").unwrap().as_str().unwrap());
+
+        error_codes.collect::<Vec<&str>>()
+    }
+
     #[sqlx::test]
     async fn cannot_create_user_with_errors(pool: Pool<Sqlite>) {
         let config = Config::default();
@@ -276,15 +287,11 @@ mod test {
             serde_json::from_str(&create_user_response.unwrap().text().await.unwrap()).unwrap();
 
         assert_eq!(
-            res,
-            json!({
-                "errors":
-                    vec![
-                        CreateUserError::InvalidConnectCode.to_string(),
-                        CreateUserError::InvalidDisplayName.to_string(),
-                    ]
-            })
+            extract_errors(&res.clone(), "connect_code"),
+            vec!["empty_discriminant"]
         );
+
+        assert_eq!(extract_errors(&res.clone(), "display_name"), vec!["length"]);
     }
 
     #[test]
