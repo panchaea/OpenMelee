@@ -3,9 +3,10 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use axum_sqlx_tx::Tx;
 use bson::{oid::ObjectId, Uuid};
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, SqliteExecutor};
+use sqlx::{Acquire, FromRow, Row, Sqlite, SqliteExecutor};
 use validator::{Validate, ValidationError, ValidationErrors};
 use wana_kana::utils::{is_char_hiragana, is_char_katakana};
 
@@ -84,7 +85,41 @@ impl User {
             .await
     }
 
-    pub async fn create<'a, T: SqliteExecutor<'a>>(
+    pub async fn check_constraints_and_create(
+        mut tx: Tx<Sqlite>,
+        display_name: String,
+        connect_code: String,
+    ) -> Result<User, ValidationErrors> {
+        let mut conn = tx.acquire().await.unwrap();
+        let mut errors = ValidationErrors::new();
+
+        if let Some(in_use) = Self::is_connect_code_in_use(conn, connect_code.clone()).await {
+            if in_use {
+                errors.add("connect_code", ValidationError::new("duplicated"));
+                return Err(errors);
+            }
+        }
+
+        conn = tx.acquire().await.unwrap();
+
+        Self::create(conn, display_name, connect_code).await
+    }
+
+    pub async fn is_connect_code_in_use<'a, T: SqliteExecutor<'a>>(
+        executor: T,
+        connect_code: String,
+    ) -> Option<bool> {
+        match sqlx::query("select count(uid) from users where connect_code = $1")
+            .bind(connect_code)
+            .fetch_one(executor)
+            .await
+        {
+            Ok(row) => Some(row.get::<i64, usize>(0) > 0),
+            _ => None,
+        }
+    }
+
+    async fn create<'a, T: SqliteExecutor<'a>>(
         executor: T,
         display_name: String,
         connect_code: String,
@@ -105,7 +140,7 @@ impl User {
                     Ok(_) => Ok(_user),
                     Err(_) => {
                         let mut errors = ValidationErrors::new();
-                        let error = ValidationError::new("constraint_validation");
+                        let error = ValidationError::new("unknown");
                         errors.add("database", error);
                         Err(errors.clone())
                     }
@@ -267,10 +302,14 @@ mod test {
             User::create(&pool, "test".to_string(), "TEST#001".to_string()).await;
 
         assert!(user_with_same_connect_code.is_err());
+
+        // NOTE: we are missing a detailed error code here, since we used
+        // User::create instead of User::check_constraints_and_create
         assert!(user_with_same_connect_code
             .unwrap_err()
             .field_errors()
             .contains_key("database"));
+
         assert_eq!(
             sqlx::query("select count(uid) from users")
                 .fetch_one(&pool)

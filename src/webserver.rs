@@ -90,10 +90,9 @@ async fn get_user(mut tx: Tx<Sqlite>, Path(uid): Path<String>) -> Result<PublicU
         .map_err(|_| UserNotFound::new())
 }
 
-async fn create_user(mut tx: Tx<Sqlite>, Form(user_form): Form<UserForm>) -> impl IntoResponse {
-    println!("Received create_user request");
-    User::create(
-        &mut tx,
+async fn create_user(tx: Tx<Sqlite>, Form(user_form): Form<UserForm>) -> impl IntoResponse {
+    User::check_constraints_and_create(
+        tx,
         user_form.display_name.to_string(),
         user_form.connect_code.to_string(),
     )
@@ -182,6 +181,7 @@ pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
 mod test {
     use std::net::TcpListener;
 
+    use rand::Rng;
     use sqlx::Pool;
 
     use crate::webserver::*;
@@ -207,10 +207,11 @@ mod test {
         );
     }
 
-    #[sqlx::test]
-    async fn can_create_user(pool: Pool<Sqlite>) {
+    async fn start_test_server(pool: Pool<Sqlite>) -> (String, reqwest::Client) {
+        let mut rng = rand::thread_rng();
         let config = Config::default();
-        let addr = format!("{}:{}", config.webserver_address, config.webserver_port);
+        let port: u16 = rng.gen_range(config.webserver_port..10000);
+        let addr = format!("{}:{}", config.webserver_address, port);
         let listener = TcpListener::bind(addr.parse::<SocketAddr>().unwrap()).unwrap();
 
         tokio::spawn(async move {
@@ -221,7 +222,12 @@ mod test {
                 .unwrap();
         });
 
-        let client = reqwest::Client::new();
+        (addr, reqwest::Client::new())
+    }
+
+    #[sqlx::test]
+    async fn can_create_user(pool: Pool<Sqlite>) {
+        let (addr, client) = start_test_server(pool).await;
 
         let create_user_response = client
             .post(format!("http://{}/user", addr))
@@ -260,19 +266,7 @@ mod test {
 
     #[sqlx::test]
     async fn cannot_create_user_with_errors(pool: Pool<Sqlite>) {
-        let config = Config::default();
-        let addr = format!("{}:{}", config.webserver_address, config.webserver_port + 1);
-        let listener = TcpListener::bind(addr.parse::<SocketAddr>().unwrap()).unwrap();
-
-        tokio::spawn(async move {
-            axum::Server::from_tcp(listener)
-                .unwrap()
-                .serve(app(pool).await.into_make_service())
-                .await
-                .unwrap();
-        });
-
-        let client = reqwest::Client::new();
+        let (addr, client) = start_test_server(pool).await;
 
         let create_user_response = client
             .post(format!("http://{}/user", addr))
@@ -292,6 +286,38 @@ mod test {
         );
 
         assert_eq!(extract_errors(&res.clone(), "display_name"), vec!["length"]);
+    }
+
+    #[sqlx::test]
+    async fn cannot_create_user_with_existing_connect_code(pool: Pool<Sqlite>) {
+        let (addr, client) = start_test_server(pool).await;
+
+        client
+            .post(format!("http://{}/user", addr))
+            .form(&UserForm {
+                display_name: "test".to_string(),
+                connect_code: "TEST#001".to_string(),
+            })
+            .send()
+            .await
+            .expect("First create_user request failed");
+
+        let create_user_response = client
+            .post(format!("http://{}/user", addr))
+            .form(&UserForm {
+                display_name: "test".to_string(),
+                connect_code: "TEST#001".to_string(),
+            })
+            .send()
+            .await;
+
+        let res: serde_json::Value =
+            serde_json::from_str(&create_user_response.unwrap().text().await.unwrap()).unwrap();
+
+        assert_eq!(
+            extract_errors(&res.clone(), "connect_code"),
+            vec!["duplicated"]
+        );
     }
 
     #[test]
