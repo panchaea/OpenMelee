@@ -207,7 +207,7 @@ fn is_displayable_in_game(s: &str) -> Result<(), ValidationError> {
 
 fn connect_code_contains_separator(s: &str) -> Result<(), ValidationError> {
     if !s.contains(CONNECT_CODE_SEPARATOR) {
-        return Err(ValidationError::new("missing_separator"));
+        return Err(ValidationError::new("separator_missing"));
     }
 
     Ok(())
@@ -216,7 +216,7 @@ fn connect_code_contains_separator(s: &str) -> Result<(), ValidationError> {
 fn connect_code_prefix_is_not_empty(s: &str) -> Result<(), ValidationError> {
     if let Some((prefix, _)) = s.split_once(CONNECT_CODE_SEPARATOR) {
         if prefix.is_empty() {
-            return Err(ValidationError::new("empty_prefix"));
+            return Err(ValidationError::new("prefix_length"));
         }
     }
 
@@ -230,7 +230,7 @@ fn connect_code_prefix_contains_only_valid_characters(s: &str) -> Result<(), Val
                 .chars()
                 .any(|c| NAME_ENTRY_SELECTABLE_PUNCTUATION.contains(&&c))
         {
-            return Err(ValidationError::new("invalid_characters_in_prefix"));
+            return Err(ValidationError::new("prefix_invalid_characters"));
         }
     }
 
@@ -240,7 +240,7 @@ fn connect_code_prefix_contains_only_valid_characters(s: &str) -> Result<(), Val
 fn connect_code_discriminant_is_not_empty(s: &str) -> Result<(), ValidationError> {
     if let Some((_, discriminant)) = s.split_once(CONNECT_CODE_SEPARATOR) {
         if discriminant.is_empty() {
-            return Err(ValidationError::new("empty_discriminant"));
+            return Err(ValidationError::new("discriminant_length"));
         }
     }
 
@@ -252,9 +252,7 @@ fn connect_code_discriminant_contains_only_numeric_characters(
 ) -> Result<(), ValidationError> {
     if let Some((_, discriminant)) = s.split_once(CONNECT_CODE_SEPARATOR) {
         if !discriminant.chars().all(char::is_numeric) {
-            return Err(ValidationError::new(
-                "non_numeric_characters_in_discriminant",
-            ));
+            return Err(ValidationError::new("discriminant_invalid_characters"));
         }
     }
 
