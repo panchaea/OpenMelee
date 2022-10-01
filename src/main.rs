@@ -14,16 +14,7 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
-enum Commands {
-    CreateUser {
-        #[clap(short, long, action, default_value_t = String::from("127.0.0.1:5000"),)]
-        server: String,
-        #[clap(value_parser)]
-        display_name: String,
-        #[clap(value_parser)]
-        connect_code: String,
-    },
-}
+enum Commands {}
 
 #[tokio::main]
 async fn main() {
@@ -35,26 +26,6 @@ async fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::CreateUser {
-            server,
-            display_name,
-            connect_code,
-        }) => {
-            let client = reqwest::Client::new();
-            let res = client
-                .post(format!("http://{}/user", server))
-                .form(&webserver::UserForm {
-                    display_name: display_name.to_string(),
-                    connect_code: connect_code.to_string(),
-                })
-                .send()
-                .await;
-
-            match res {
-                Ok(res) => println!("Response: {:?}", res.text().await),
-                Err(err) => println!("Failed {:?}", err),
-            }
-        }
         None => {
             let pool = init_pool(config.clone()).await;
 
@@ -74,5 +45,6 @@ async fn main() {
                 println!("ENet server thread exited abnormally")
             }
         }
+        Some(_) => (),
     }
 }
