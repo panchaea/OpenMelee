@@ -171,7 +171,7 @@ impl User {
         result
     }
 
-    pub async fn is_connect_code_in_use<'a, T: SqliteExecutor<'a>>(
+    async fn is_connect_code_in_use<'a, T: SqliteExecutor<'a>>(
         executor: T,
         connect_code: String,
     ) -> Option<bool> {
