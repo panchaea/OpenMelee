@@ -37,7 +37,7 @@ pub struct User {
             message = "Connect code must be between 1 and 8 characters long"
         ),
         custom(
-            function = "contains_connect_code_separator",
+            function = "connect_code_contains_separator",
             message = "Connect code must consist of characters, followed by a # symbol, followed by numbers"
         ),
         custom(
@@ -69,11 +69,11 @@ impl IntoResponse for User {
 
 impl User {
     pub fn is_valid_connect_code(connect_code: &str) -> bool {
-        contains_connect_code_separator(connect_code).is_ok()
-            && prefix_is_not_empty(connect_code).is_ok()
-            && prefix_contains_valid_characters(connect_code).is_ok()
-            && discriminant_is_not_empty(connect_code).is_ok()
-            && discriminant_contains_numeric_characters(connect_code).is_ok()
+        connect_code_contains_separator(connect_code).is_ok()
+            && connect_code_prefix_is_not_empty(connect_code).is_ok()
+            && connect_code_prefix_contains_only_valid_characters(connect_code).is_ok()
+            && connect_code_discriminant_is_not_empty(connect_code).is_ok()
+            && connect_code_discriminant_contains_only_numeric_characters(connect_code).is_ok()
     }
 
     pub fn new(display_name: String, connect_code: String) -> Result<User, ValidationErrors> {
@@ -194,7 +194,7 @@ fn is_displayable_in_game(s: &str) -> Result<(), ValidationError> {
     Err(ValidationError::new("not_displayable_in_game"))
 }
 
-fn contains_connect_code_separator(s: &str) -> Result<(), ValidationError> {
+fn connect_code_contains_separator(s: &str) -> Result<(), ValidationError> {
     if !s.contains(CONNECT_CODE_SEPARATOR) {
         return Err(ValidationError::new("missing_separator"));
     }
