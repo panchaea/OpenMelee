@@ -1,3 +1,7 @@
+use argon2::{
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -5,6 +9,7 @@ use axum::{
 };
 use axum_sqlx_tx::Tx;
 use bson::{oid::ObjectId, Uuid};
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sqlx::{Acquire, FromRow, Row, Sqlite, SqliteExecutor};
 use validator::{Validate, ValidationError, ValidationErrors};
@@ -108,11 +113,25 @@ impl User {
 
     pub async fn check_constraints_and_create(
         mut tx: Tx<Sqlite>,
+        username: String,
+        password: SecretString,
         display_name: String,
         connect_code: String,
     ) -> Result<User, ValidationErrors> {
         let mut conn = tx.acquire().await.unwrap();
         let mut errors = ValidationErrors::new();
+
+        if username.is_empty() {
+            let mut error = ValidationError::new("length");
+            error.message = Some(std::borrow::Cow::Borrowed("Username cannot be empty"));
+            errors.add("username", error);
+        }
+
+        if password.expose_secret().is_empty() {
+            let mut error = ValidationError::new("length");
+            error.message = Some(std::borrow::Cow::Borrowed("Password cannot be empty"));
+            errors.add("password", error);
+        }
 
         if let Some(in_use) = Self::is_connect_code_in_use(conn, connect_code.clone()).await {
             if in_use {
@@ -124,11 +143,32 @@ impl User {
 
         conn = tx.acquire().await.unwrap();
 
+        if let Some(in_use) = Self::is_username_in_use(conn, username.clone()).await {
+            if in_use {
+                let mut error = ValidationError::new("duplicated");
+                error.message = Some(std::borrow::Cow::Borrowed("Username is already in use"));
+                errors.add("username", error);
+            }
+        }
+
         if !errors.is_empty() {
             return Err(errors);
         }
 
-        Self::create(conn, display_name, connect_code).await
+        conn = tx.acquire().await.unwrap();
+
+        let result = Self::create(conn, username, password, display_name, connect_code).await;
+
+        let tx_result = tx.commit().await;
+
+        if tx_result.is_err() {
+            println!(
+                "Failed to create user: {}",
+                tx_result.unwrap_err().to_string()
+            );
+        }
+
+        result
     }
 
     pub async fn is_connect_code_in_use<'a, T: SqliteExecutor<'a>>(
@@ -145,16 +185,34 @@ impl User {
         }
     }
 
+    async fn is_username_in_use<'a, T: SqliteExecutor<'a>>(
+        executor: T,
+        username: String,
+    ) -> Option<bool> {
+        match sqlx::query("select count(uid) from users where username = $1")
+            .bind(username)
+            .fetch_one(executor)
+            .await
+        {
+            Ok(row) => Some(row.get::<i64, usize>(0) > 0),
+            _ => None,
+        }
+    }
+
     async fn create<'a, T: SqliteExecutor<'a>>(
         executor: T,
+        username: String,
+        password: SecretString,
         display_name: String,
         connect_code: String,
     ) -> Result<User, ValidationErrors> {
         match Self::new(display_name, connect_code) {
             Ok(user) => {
                 let _user = user.clone();
-                let query_result = sqlx::query("insert into users (uid, play_key, display_name, connect_code, latest_version) values ($1, $2, $3, $4, $5)")
+                let query_result = sqlx::query("insert into users (uid, username, password, play_key, display_name, connect_code, latest_version) values ($1, $2, $3, $4, $5, $6, $7)")
                     .bind(user.uid)
+                    .bind(username)
+                    .bind(Self::hash_password(password).unwrap())
                     .bind(user.play_key)
                     .bind(user.display_name)
                     .bind(user.connect_code)
@@ -174,6 +232,14 @@ impl User {
             }
             Err(errors) => Err(errors),
         }
+    }
+
+    fn hash_password(password: SecretString) -> Result<String, argon2::password_hash::Error> {
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        argon2
+            .hash_password(password.expose_secret().as_bytes(), &salt)
+            .map(|hashed_password| hashed_password.to_string())
     }
 }
 
@@ -261,7 +327,10 @@ fn connect_code_discriminant_contains_only_numeric_characters(
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
     use bson::{oid::ObjectId, Uuid};
+    use secrecy::SecretString;
     use sqlx::{Pool, Row, Sqlite};
 
     use crate::models::*;
@@ -377,9 +446,15 @@ mod test {
 
     #[sqlx::test]
     async fn can_create_user_and_get_by_uid(pool: Pool<Sqlite>) {
-        let user = User::create(&pool, "test".to_string(), "TEST#001".to_string())
-            .await
-            .expect("Could not create user");
+        let user = User::create(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("password").unwrap(),
+            "test".to_string(),
+            "TEST#001".to_string(),
+        )
+        .await
+        .expect("Could not create user");
 
         let user_from_db = User::get(&pool, user.uid.clone())
             .await
@@ -390,18 +465,70 @@ mod test {
 
     #[sqlx::test]
     async fn cannot_create_two_users_with_same_connect_code(pool: Pool<Sqlite>) {
-        User::create(&pool, "test".to_string(), "TEST#001".to_string())
-            .await
-            .expect("Could not create user");
+        User::create(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("password").unwrap(),
+            "test".to_string(),
+            "TEST#001".to_string(),
+        )
+        .await
+        .expect("Could not create user");
 
-        let user_with_same_connect_code =
-            User::create(&pool, "test".to_string(), "TEST#001".to_string()).await;
+        let user_with_same_connect_code = User::create(
+            &pool,
+            "test-2".to_string(),
+            SecretString::from_str("password").unwrap(),
+            "test".to_string(),
+            "TEST#001".to_string(),
+        )
+        .await;
 
         assert!(user_with_same_connect_code.is_err());
 
         // NOTE: we are missing a detailed error code here, since we used
         // User::create instead of User::check_constraints_and_create
         assert!(user_with_same_connect_code
+            .unwrap_err()
+            .field_errors()
+            .contains_key("database"));
+
+        assert_eq!(
+            sqlx::query("select count(uid) from users")
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+                .get::<i64, usize>(0),
+            1
+        )
+    }
+
+    #[sqlx::test]
+    async fn cannot_create_two_users_with_same_username(pool: Pool<Sqlite>) {
+        User::create(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("password").unwrap(),
+            "test".to_string(),
+            "TEST#001".to_string(),
+        )
+        .await
+        .expect("Could not create user");
+
+        let user_with_same_username = User::create(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("password").unwrap(),
+            "test".to_string(),
+            "TEST#002".to_string(),
+        )
+        .await;
+
+        assert!(user_with_same_username.is_err());
+
+        // NOTE: we are missing a detailed error code here, since we used
+        // User::create instead of User::check_constraints_and_create
+        assert!(user_with_same_username
             .unwrap_err()
             .field_errors()
             .contains_key("database"));

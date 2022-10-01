@@ -5,13 +5,13 @@ use axum::{
     extract::Path,
     handler::Handler,
     http::{header, StatusCode, Uri},
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
     Extension, Form, Json, Router,
 };
 use axum_sqlx_tx::Tx;
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::{Sqlite, SqlitePool};
 use tera::{Context, Tera};
 
@@ -52,11 +52,29 @@ impl IntoResponse for PublicUser {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Deserialize)]
 pub struct UserForm {
+    pub username: String,
+    pub password: SecretString,
     pub display_name: String,
     pub connect_code: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PublicUserForm {
+    pub username: String,
+    pub display_name: String,
+    pub connect_code: String,
+}
+
+impl From<&UserForm> for PublicUserForm {
+    fn from(user_form: &UserForm) -> PublicUserForm {
+        PublicUserForm {
+            username: user_form.username.clone(),
+            display_name: user_form.display_name.clone(),
+            connect_code: user_form.connect_code.clone(),
+        }
+    }
 }
 
 impl From<&User> for PublicUser {
@@ -90,17 +108,34 @@ async fn get_user(mut tx: Tx<Sqlite>, Path(uid): Path<String>) -> Result<PublicU
         .map_err(|_| UserNotFound::new())
 }
 
-async fn create_user(tx: Tx<Sqlite>, Form(user_form): Form<UserForm>) -> impl IntoResponse {
+async fn register(Extension(tera): Extension<Tera>) -> Html<String> {
+    let mut context = Context::new();
+    context.insert("field_errors", &false);
+    context.insert("field_values", &false);
+    let content = tera.render("register.html.tera", &context).unwrap();
+    Html(content)
+}
+
+async fn register_form(
+    tx: Tx<Sqlite>,
+    Form(user_form): Form<UserForm>,
+    Extension(tera): Extension<Tera>,
+) -> impl IntoResponse {
     User::check_constraints_and_create(
         tx,
+        user_form.username.to_string(),
+        user_form.password.clone(),
         user_form.display_name.to_string(),
         user_form.connect_code.to_string(),
     )
     .await
-    .map(|user| PublicUser::from(&user))
+    .map(|_| Redirect::to("/"))
     .map_err(|errors| {
-        let body = json!({ "errors": errors });
-        (StatusCode::BAD_REQUEST, body.to_string())
+        let mut context = Context::new();
+        context.insert("field_errors", &errors.field_errors());
+        context.insert("field_values", &PublicUserForm::from(&user_form));
+        let content = tera.render("register.html.tera", &context).unwrap();
+        (StatusCode::BAD_REQUEST, Html(content))
     })
 }
 
@@ -154,7 +189,8 @@ fn load_templates() -> Tera {
 async fn app(pool: SqlitePool) -> Router {
     Router::new()
         .route("/", get(index))
-        .route("/user", post(create_user))
+        .route("/register", get(register))
+        .route("/register", post(register_form))
         .route("/user/:uid", get(get_user))
         .route("/static/*file", static_handler.into_service())
         .fallback(get(not_found))
@@ -180,11 +216,15 @@ pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
 #[cfg(test)]
 mod test {
     use std::net::TcpListener;
+    use std::str::FromStr;
 
     use rand::Rng;
+    use serde_json::json;
     use sqlx::Pool;
 
     use crate::webserver::*;
+
+    const TEST_USER_PASSWORD: &str = "5~}Eau&b5C1df.LI_|mOXnl0";
 
     #[test]
     fn test_can_create_public_user_from_user() {
@@ -207,6 +247,27 @@ mod test {
         );
     }
 
+    async fn test_register_form(
+        tx: Tx<Sqlite>,
+        Form(user_form): Form<PublicUserForm>,
+    ) -> impl IntoResponse {
+        let password: SecretString = SecretString::from_str(TEST_USER_PASSWORD).unwrap();
+
+        User::check_constraints_and_create(
+            tx,
+            user_form.username.to_string(),
+            password,
+            user_form.display_name.to_string(),
+            user_form.connect_code.to_string(),
+        )
+        .await
+        .map(|user| PublicUser::from(&user))
+        .map_err(|errors| {
+            let body = json!({ "errors": errors });
+            (StatusCode::BAD_REQUEST, body.to_string())
+        })
+    }
+
     async fn start_test_server(pool: Pool<Sqlite>) -> (String, reqwest::Client) {
         let mut rng = rand::thread_rng();
         let config = Config::default();
@@ -214,40 +275,28 @@ mod test {
         let addr = format!("{}:{}", config.webserver_address, port);
         let listener = TcpListener::bind(addr.parse::<SocketAddr>().unwrap()).unwrap();
 
+        // Create a custom router which serves normal routes,
+        // except for POST /register, which creates users with
+        // a constant password and returns JSON
+        let test_app: Router = Router::new()
+            .route("/", get(index))
+            .route("/register", get(register))
+            .route("/register", post(test_register_form))
+            .route("/user/:uid", get(get_user))
+            .route("/static/*file", static_handler.into_service())
+            .fallback(get(not_found))
+            .layer(axum_sqlx_tx::Layer::new(pool))
+            .layer(Extension(load_templates()));
+
         tokio::spawn(async move {
             axum::Server::from_tcp(listener)
                 .unwrap()
-                .serve(app(pool).await.into_make_service())
+                .serve(test_app.into_make_service())
                 .await
                 .unwrap();
         });
 
         (addr, reqwest::Client::new())
-    }
-
-    #[sqlx::test]
-    async fn can_create_user(pool: Pool<Sqlite>) {
-        let (addr, client) = start_test_server(pool).await;
-
-        let create_user_response = client
-            .post(format!("http://{}/user", addr))
-            .form(&UserForm {
-                display_name: "test".to_string(),
-                connect_code: "TEST#001".to_string(),
-            })
-            .send()
-            .await;
-
-        assert!(create_user_response.is_ok());
-
-        let created_user = create_user_response
-            .unwrap()
-            .json::<PublicUser>()
-            .await
-            .expect("Could not convert create_user response to JSON");
-
-        assert_eq!(created_user.display_name, "test".to_string());
-        assert_eq!(created_user.connect_code, "TEST#001".to_string());
     }
 
     fn extract_errors<'a>(res: &'a serde_json::Value, field: &str) -> Vec<&'a str> {
@@ -265,12 +314,41 @@ mod test {
     }
 
     #[sqlx::test]
-    async fn cannot_create_user_with_errors(pool: Pool<Sqlite>) {
+    async fn can_register(pool: Pool<Sqlite>) {
+        let (addr, client) = start_test_server(pool.clone()).await;
+
+        let register_response = client
+            .post(format!("http://{}/register", addr))
+            .form(&PublicUserForm {
+                username: "test".to_string(),
+                display_name: "test".to_string(),
+                connect_code: "TEST#001".to_string(),
+            })
+            .send()
+            .await;
+
+        assert!(register_response.is_ok());
+
+        let created_user = register_response
+            .unwrap()
+            .json::<PublicUser>()
+            .await
+            .expect("Could not convert register_response to JSON");
+
+        assert_eq!(created_user.display_name, "test".to_string());
+        assert_eq!(created_user.connect_code, "TEST#001".to_string());
+
+        assert!(User::get(&pool, created_user.uid).await.is_ok());
+    }
+
+    #[sqlx::test]
+    async fn cannot_register_with_errors(pool: Pool<Sqlite>) {
         let (addr, client) = start_test_server(pool).await;
 
-        let create_user_response = client
-            .post(format!("http://{}/user", addr))
-            .form(&UserForm {
+        let register_response = client
+            .post(format!("http://{}/register", addr))
+            .form(&PublicUserForm {
+                username: "test".to_string(),
                 display_name: "".to_string(),
                 connect_code: "TEST#".to_string(),
             })
@@ -278,33 +356,35 @@ mod test {
             .await;
 
         let res: serde_json::Value =
-            serde_json::from_str(&create_user_response.unwrap().text().await.unwrap()).unwrap();
+            serde_json::from_str(&register_response.unwrap().text().await.unwrap()).unwrap();
 
         assert_eq!(
             extract_errors(&res.clone(), "connect_code"),
-            vec!["empty_discriminant"]
+            vec!["discriminant_length"]
         );
 
         assert_eq!(extract_errors(&res.clone(), "display_name"), vec!["length"]);
     }
 
     #[sqlx::test]
-    async fn cannot_create_user_with_existing_connect_code(pool: Pool<Sqlite>) {
+    async fn cannot_register_with_existing_connect_code_or_username(pool: Pool<Sqlite>) {
         let (addr, client) = start_test_server(pool).await;
 
         client
-            .post(format!("http://{}/user", addr))
-            .form(&UserForm {
+            .post(format!("http://{}/register", addr))
+            .form(&PublicUserForm {
+                username: "test".to_string(),
                 display_name: "test".to_string(),
                 connect_code: "TEST#001".to_string(),
             })
             .send()
             .await
-            .expect("First create_user request failed");
+            .expect("First registration attempt failed");
 
-        let create_user_response = client
-            .post(format!("http://{}/user", addr))
-            .form(&UserForm {
+        let register_response = client
+            .post(format!("http://{}/register", addr))
+            .form(&PublicUserForm {
+                username: "test".to_string(),
                 display_name: "test".to_string(),
                 connect_code: "TEST#001".to_string(),
             })
@@ -312,12 +392,14 @@ mod test {
             .await;
 
         let res: serde_json::Value =
-            serde_json::from_str(&create_user_response.unwrap().text().await.unwrap()).unwrap();
+            serde_json::from_str(&register_response.unwrap().text().await.unwrap()).unwrap();
 
         assert_eq!(
             extract_errors(&res.clone(), "connect_code"),
             vec!["duplicated"]
         );
+
+        assert_eq!(extract_errors(&res.clone(), "username"), vec!["duplicated"]);
     }
 
     #[test]
