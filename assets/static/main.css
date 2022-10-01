@@ -31,3 +31,13 @@ ol > .navbar-item:first-child {
 ol > .navbar-item:last-child {
     padding-right: 0px;
 }
+
+.error {
+    display: block;
+    font-size-adjust: 0.4;
+    margin-left: 2em;
+}
+
+.error::before {
+    content: "- ";
+}

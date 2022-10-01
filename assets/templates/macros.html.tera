@@ -1,0 +1,15 @@
+{% macro input(name, label, errors=false, values=false, type="text", required="true") %}
+  <div class="col">
+    <label for="{{name}}">{{ label }}</label>
+    {% if values[name] %}
+      <input type="{{type}}" name="{{name}}" required="{{required}}" value="{{values[name]}}" aria-required="{{required}}" aria-invalid="{{name in errors}}" aria-describedby="{{name ~ '_error' }}">
+    {% else %}
+      <input type="{{type}}" name="{{name}}" required="{{required}}">
+    {% endif %}
+    {% if errors[name] %}
+      {% for error in errors[name] %}
+        <strong id="{{name}}_error" class="error">{{ error.message }}</strong>
+      {% endfor %}
+    {% endif %}
+  </div>
+{% endmacro %}
