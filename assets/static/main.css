@@ -36,6 +36,7 @@ ol > .navbar-item:last-child {
     display: block;
     font-size-adjust: 0.4;
     margin-left: 2em;
+    white-space: pre;
 }
 
 .error::before {
