@@ -225,7 +225,7 @@ fn connect_code_prefix_is_not_empty(s: &str) -> Result<(), ValidationError> {
 
 fn connect_code_prefix_contains_only_valid_characters(s: &str) -> Result<(), ValidationError> {
     if let Some((prefix, _)) = s.split_once(CONNECT_CODE_SEPARATOR) {
-        if !is_selectable_in_name_entry(prefix).is_ok()
+        if is_selectable_in_name_entry(prefix).is_err()
             || prefix
                 .chars()
                 .any(|c| NAME_ENTRY_SELECTABLE_PUNCTUATION.contains(&&c))
