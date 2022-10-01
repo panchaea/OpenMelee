@@ -15,17 +15,47 @@ const CONNECT_CODE_MAX_LENGTH: usize = 8;
 const CONNECT_CODE_TAG_VALID_PUNCTUATION: &[&char] = &[
     &'+', &'-', &'=', &'!', &'?', &'@', &'%', &'&', &'$', &'.', &' ', &'｡', &'､',
 ];
+const OTHER_DISPLAYABLE_PUNCTUATION: &[&char] = &[&'\\', &'#'];
 
 #[derive(Debug, PartialEq, Eq, FromRow, Clone, Validate, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub uid: String,
     pub play_key: String,
-    #[validate(length(min = 1), custom = "is_displayable_in_game")]
+    #[validate(
+        length(min = 1, message = "Display name is too short"),
+        custom(
+            function = "is_displayable_in_game",
+            message = "Display name contains invalid characters"
+        )
+    )]
     pub display_name: String,
     #[validate(
-        length(min = 1, max = "CONNECT_CODE_MAX_LENGTH"),
-        custom = "User::is_valid_connect_code"
+        length(
+            min = 1,
+            max = "CONNECT_CODE_MAX_LENGTH",
+            message = "Connect code must be between 1 and 8 characters long"
+        ),
+        custom(
+            function = "contains_connect_code_separator",
+            message = "Connect code must consist of characters, followed by a # symbol, followed by numbers"
+        ),
+        custom(
+            function = "connect_code_prefix_is_not_empty",
+            message = "At least one character must be present before the # symbol"
+        ),
+        custom(
+            function = "connect_code_prefix_contains_only_valid_characters",
+            message = "Only characters which can be entered from the 'Name entry' screen may precede the # symbol"
+        ),
+        custom(
+            function = "connect_code_discriminant_is_not_empty",
+            message = "At least one number must be present after the # symbol"
+        ),
+        custom(
+            function = "connect_code_discriminant_contains_only_numeric_characters",
+            message = "Only numbers may follow the # symbol"
+        )
     )]
     pub connect_code: String,
     pub latest_version: Option<String>,
@@ -38,29 +68,12 @@ impl IntoResponse for User {
 }
 
 impl User {
-    pub fn is_valid_connect_code(connect_code: &str) -> Result<(), ValidationError> {
-        return match connect_code.split_once(CONNECT_CODE_SEPARATOR) {
-            Some((tag, discriminant)) => {
-                if tag.is_empty() {
-                    return Err(ValidationError::new("empty_prefix"));
-                }
-
-                if is_displayable_in_game(tag).is_err() {
-                    return Err(ValidationError::new("prefix_invalid_characters"));
-                }
-
-                if discriminant.is_empty() {
-                    return Err(ValidationError::new("empty_discriminant"));
-                }
-
-                if !discriminant.chars().all(char::is_numeric) {
-                    return Err(ValidationError::new("discriminant_invalid_characters"));
-                }
-
-                Ok(())
-            }
-            _ => Err(ValidationError::new("missing_separator")),
-        };
+    pub fn is_valid_connect_code(connect_code: &str) -> bool {
+        contains_connect_code_separator(connect_code).is_ok()
+            && prefix_is_not_empty(connect_code).is_ok()
+            && prefix_contains_valid_characters(connect_code).is_ok()
+            && discriminant_is_not_empty(connect_code).is_ok()
+            && discriminant_contains_numeric_characters(connect_code).is_ok()
     }
 
     pub fn new(display_name: String, connect_code: String) -> Result<User, ValidationErrors> {
@@ -95,12 +108,17 @@ impl User {
 
         if let Some(in_use) = Self::is_connect_code_in_use(conn, connect_code.clone()).await {
             if in_use {
-                errors.add("connect_code", ValidationError::new("duplicated"));
-                return Err(errors);
+                let mut error = ValidationError::new("duplicated");
+                error.message = Some(std::borrow::Cow::Borrowed("Connect code is already in use"));
+                errors.add("connect_code", error);
             }
         }
 
         conn = tx.acquire().await.unwrap();
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
 
         Self::create(conn, display_name, connect_code).await
     }
@@ -151,19 +169,81 @@ impl User {
     }
 }
 
-fn is_displayable_in_game(s: &str) -> Result<(), ValidationError> {
+fn is_selectable_in_name_entry(s: &str) -> Result<(), ValidationError> {
     if s.chars().all(|c| {
         is_char_hiragana(c)
             || is_char_katakana(c)
-            || char::is_ascii_alphanumeric(&c)
+            || char::is_numeric(c)
+            || char::is_ascii_uppercase(&c)
             || CONNECT_CODE_TAG_VALID_PUNCTUATION.contains(&&c)
     }) {
         return Ok(());
     }
 
-    Err(ValidationError::new(
-        "Not displayable with Melee's character set",
-    ))
+    Err(ValidationError::new("not_selectable_in_name_entry"))
+}
+
+fn is_displayable_in_game(s: &str) -> Result<(), ValidationError> {
+    if is_selectable_in_name_entry(s).is_ok()
+        || s.chars()
+            .all(|c| char::is_ascii_alphanumeric(&c) || OTHER_DISPLAYABLE_PUNCTUATION.contains(&&c))
+    {
+        return Ok(());
+    }
+
+    Err(ValidationError::new("not_displayable_in_game"))
+}
+
+fn contains_connect_code_separator(s: &str) -> Result<(), ValidationError> {
+    if !s.contains(CONNECT_CODE_SEPARATOR) {
+        return Err(ValidationError::new("missing_separator"));
+    }
+
+    Ok(())
+}
+
+fn connect_code_prefix_is_not_empty(s: &str) -> Result<(), ValidationError> {
+    if let Some((prefix, _)) = s.split_once(CONNECT_CODE_SEPARATOR) {
+        if prefix.is_empty() {
+            return Err(ValidationError::new("empty_prefix"));
+        }
+    }
+
+    Ok(())
+}
+
+fn connect_code_prefix_contains_only_valid_characters(s: &str) -> Result<(), ValidationError> {
+    if let Some((prefix, _)) = s.split_once(CONNECT_CODE_SEPARATOR) {
+        if !is_selectable_in_name_entry(prefix).is_ok() {
+            return Err(ValidationError::new("invalid_characters_in_prefix"));
+        }
+    }
+
+    Ok(())
+}
+
+fn connect_code_discriminant_is_not_empty(s: &str) -> Result<(), ValidationError> {
+    if let Some((_, discriminant)) = s.split_once(CONNECT_CODE_SEPARATOR) {
+        if discriminant.is_empty() {
+            return Err(ValidationError::new("empty_discriminant"));
+        }
+    }
+
+    Ok(())
+}
+
+fn connect_code_discriminant_contains_only_numeric_characters(
+    s: &str,
+) -> Result<(), ValidationError> {
+    if let Some((_, discriminant)) = s.split_once(CONNECT_CODE_SEPARATOR) {
+        if !discriminant.chars().all(char::is_numeric) {
+            return Err(ValidationError::new(
+                "non_numeric_characters_in_discriminant",
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -175,55 +255,42 @@ mod test {
 
     #[test]
     fn connect_code_with_katakana_is_valid() {
-        assert!(User::is_valid_connect_code("リッピー#0").is_ok());
+        assert!(User::is_valid_connect_code("リッピー#0"));
     }
 
     #[test]
     fn connect_code_with_hiragana_is_valid() {
-        assert!(User::is_valid_connect_code("やまと#99").is_ok());
+        assert!(User::is_valid_connect_code("やまと#99"));
     }
 
     #[test]
     fn connect_code_with_valid_punctuation_is_valid() {
-        assert!(User::is_valid_connect_code("&-.%#123").is_ok());
-        assert!(User::is_valid_connect_code("+?A!#524").is_ok());
-        assert!(User::is_valid_connect_code("｡  9#558").is_ok());
+        assert!(User::is_valid_connect_code("&-.%#123"));
+        assert!(User::is_valid_connect_code("+?A!#524"));
+        assert!(User::is_valid_connect_code("｡  9#558"));
     }
 
     #[test]
     fn connect_code_with_invalid_punctuation_is_not_valid() {
-        assert_eq!(
-            User::is_valid_connect_code("!!!*#958").unwrap_err().code,
-            "prefix_invalid_characters"
-        );
-        assert_eq!(
-            User::is_valid_connect_code("()''#88").unwrap_err().code,
-            "prefix_invalid_characters"
-        );
-        assert_eq!(
-            User::is_valid_connect_code("AAAA#AA").unwrap_err().code,
-            "discriminant_invalid_characters"
-        );
+        assert!(!User::is_valid_connect_code("!!!*#958"));
+        assert!(!User::is_valid_connect_code("()''#88"));
+        assert!(!User::is_valid_connect_code("AAAA#AA"));
+    }
+
+    #[test]
+    fn connect_code_with_lower_case_is_not_valid() {
+        assert!(!User::is_valid_connect_code("test#001"));
     }
 
     #[test]
     fn connect_code_with_empty_tag_or_discriminant_is_not_valid() {
-        assert_eq!(
-            User::is_valid_connect_code("TEST#").unwrap_err().code,
-            "empty_discriminant"
-        );
-        assert_eq!(
-            User::is_valid_connect_code("#0001").unwrap_err().code,
-            "empty_prefix"
-        );
+        assert!(!User::is_valid_connect_code("TEST#"));
+        assert!(!User::is_valid_connect_code("#0001"));
     }
 
     #[test]
     fn connect_code_without_separator_is_not_valid() {
-        assert_eq!(
-            User::is_valid_connect_code("TEST001").unwrap_err().code,
-            "missing_separator"
-        );
+        assert!(!User::is_valid_connect_code("TEST001"));
     }
 
     #[test]
