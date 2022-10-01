@@ -1,0 +1,18 @@
+{% extends "base.html.tera" %}
+{% block title %}Register{% endblock title %}
+{% block content %}
+{% include "navbar.html.tera" %}
+<h1>Register</h1>
+<form action="/register" method="post" enctype="application/x-www-form-urlencoded">
+  <fieldset>
+    <legend>Details</legend>
+    <div class="row">
+      {{ macros::input(name="username", label="Username", errors=field_errors, values=field_values) }}
+      {{ macros::input(name="password", label="Password", errors=field_errors, values=field_values, type="password") }}
+      {{ macros::input(name="display_name", label="Display name", errors=field_errors, values=field_values) }}
+      {{ macros::input(name="connect_code", label="Connect code", errors=field_errors, values=field_values) }}
+    </div>
+  </fieldset>
+  <input type="submit" value="Submit" />
+</form>
+{% endblock content %}
