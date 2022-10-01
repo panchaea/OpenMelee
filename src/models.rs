@@ -12,10 +12,10 @@ use wana_kana::utils::{is_char_hiragana, is_char_katakana};
 
 const CONNECT_CODE_SEPARATOR: &str = "#";
 const CONNECT_CODE_MAX_LENGTH: usize = 8;
-const CONNECT_CODE_TAG_VALID_PUNCTUATION: &[&char] = &[
-    &'+', &'-', &'=', &'!', &'?', &'@', &'%', &'&', &'$', &'.', &' ', &'｡', &'､',
+const NAME_ENTRY_SELECTABLE_PUNCTUATION: &'static [&'static char] = &[
+    &'+', &'-', &'=', &'!', &'?', &'@', &'%', &'&', &'#', &'$', &'.', &' ', &'｡', &'､',
 ];
-const OTHER_DISPLAYABLE_PUNCTUATION: &[&char] = &[&'\\', &'#'];
+const OTHER_DISPLAYABLE_PUNCTUATION: &[&char] = &[&'/'];
 
 #[derive(Debug, PartialEq, Eq, FromRow, Clone, Validate, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,7 +26,9 @@ pub struct User {
         length(min = 1, message = "Display name is too short"),
         custom(
             function = "is_displayable_in_game",
-            message = "Display name contains invalid characters"
+            message = "Only uppercase English letters, numbers, hiragana and katakana characters, \
+                       spaces, and the following punctuation are allowed: \
+                       +, -, /, =, !, ?, @, %, &, #, $, ., ｡, ､"
         )
     )]
     pub display_name: String,
@@ -34,19 +36,25 @@ pub struct User {
         length(
             min = 1,
             max = "CONNECT_CODE_MAX_LENGTH",
-            message = "Connect code must be between 1 and 8 characters long"
+            message = "Must be at least 1 and at most 8 characters long"
         ),
         custom(
             function = "connect_code_contains_separator",
-            message = "Connect code must consist of characters, followed by a # symbol, followed by numbers"
+            message = "Must consist of: \n\
+                         * English uppercase letters, numbers, hiragana characters, \
+                           or katakana characters, \n\
+                         * followed by a # symbol, \n\
+                         * followed by at least one number"
         ),
         custom(
             function = "connect_code_prefix_is_not_empty",
-            message = "At least one character must be present before the # symbol"
+            message = "At least one English uppercase letter, number, hiragana character, \
+                       or katakana character must be present before the # symbol"
         ),
         custom(
             function = "connect_code_prefix_contains_only_valid_characters",
-            message = "Only characters which can be entered from the 'Name entry' screen may precede the # symbol"
+            message = "Only English uppercase letters, numbers, hiragana characters, and \
+                       katakana characters may be present before the # symbol"
         ),
         custom(
             function = "connect_code_discriminant_is_not_empty",
@@ -54,7 +62,7 @@ pub struct User {
         ),
         custom(
             function = "connect_code_discriminant_contains_only_numeric_characters",
-            message = "Only numbers may follow the # symbol"
+            message = "Only numbers may be present after the # symbol"
         )
     )]
     pub connect_code: String,
@@ -175,7 +183,7 @@ fn is_selectable_in_name_entry(s: &str) -> Result<(), ValidationError> {
             || is_char_katakana(c)
             || char::is_numeric(c)
             || char::is_ascii_uppercase(&c)
-            || CONNECT_CODE_TAG_VALID_PUNCTUATION.contains(&&c)
+            || NAME_ENTRY_SELECTABLE_PUNCTUATION.contains(&&c)
     }) {
         return Ok(());
     }
@@ -185,8 +193,11 @@ fn is_selectable_in_name_entry(s: &str) -> Result<(), ValidationError> {
 
 fn is_displayable_in_game(s: &str) -> Result<(), ValidationError> {
     if is_selectable_in_name_entry(s).is_ok()
-        || s.chars()
-            .all(|c| char::is_ascii_alphanumeric(&c) || OTHER_DISPLAYABLE_PUNCTUATION.contains(&&c))
+        || s.chars().all(|c| {
+            char::is_ascii_alphanumeric(&c)
+                || NAME_ENTRY_SELECTABLE_PUNCTUATION.contains(&&c)
+                || OTHER_DISPLAYABLE_PUNCTUATION.contains(&&c)
+        })
     {
         return Ok(());
     }
@@ -214,7 +225,11 @@ fn connect_code_prefix_is_not_empty(s: &str) -> Result<(), ValidationError> {
 
 fn connect_code_prefix_contains_only_valid_characters(s: &str) -> Result<(), ValidationError> {
     if let Some((prefix, _)) = s.split_once(CONNECT_CODE_SEPARATOR) {
-        if !is_selectable_in_name_entry(prefix).is_ok() {
+        if !is_selectable_in_name_entry(prefix).is_ok()
+            || prefix
+                .chars()
+                .any(|c| NAME_ENTRY_SELECTABLE_PUNCTUATION.contains(&&c))
+        {
             return Err(ValidationError::new("invalid_characters_in_prefix"));
         }
     }
@@ -254,6 +269,16 @@ mod test {
     use crate::models::*;
 
     #[test]
+    fn connect_code_with_letters_is_valid() {
+        assert!(User::is_valid_connect_code("FOO#999"));
+    }
+
+    #[test]
+    fn connect_code_with_numbers_is_valid() {
+        assert!(User::is_valid_connect_code("TEST9#03"));
+    }
+
+    #[test]
     fn connect_code_with_katakana_is_valid() {
         assert!(User::is_valid_connect_code("リッピー#0"));
     }
@@ -264,14 +289,10 @@ mod test {
     }
 
     #[test]
-    fn connect_code_with_valid_punctuation_is_valid() {
-        assert!(User::is_valid_connect_code("&-.%#123"));
-        assert!(User::is_valid_connect_code("+?A!#524"));
-        assert!(User::is_valid_connect_code("｡  9#558"));
-    }
-
-    #[test]
-    fn connect_code_with_invalid_punctuation_is_not_valid() {
+    fn connect_code_with_punctuation_is_not_valid() {
+        assert!(!User::is_valid_connect_code("&-.%#123"));
+        assert!(!User::is_valid_connect_code("+?A!#524"));
+        assert!(!User::is_valid_connect_code("｡  9#558"));
         assert!(!User::is_valid_connect_code("!!!*#958"));
         assert!(!User::is_valid_connect_code("()''#88"));
         assert!(!User::is_valid_connect_code("AAAA#AA"));
@@ -300,6 +321,16 @@ mod test {
         assert!(ObjectId::parse_str(user.clone().unwrap().play_key).is_ok());
         assert!(Uuid::parse_str(user.clone().unwrap().uid).is_ok());
         assert_eq!(user.clone().unwrap().display_name, "test");
+        assert_eq!(user.clone().unwrap().connect_code, "TEST#001");
+    }
+
+    #[test]
+    fn can_include_slashes_in_display_name() {
+        let user = User::new("site/user".to_string(), "TEST#001".to_string());
+        assert!(user.is_ok());
+        assert!(ObjectId::parse_str(user.clone().unwrap().play_key).is_ok());
+        assert!(Uuid::parse_str(user.clone().unwrap().uid).is_ok());
+        assert_eq!(user.clone().unwrap().display_name, "site/user");
         assert_eq!(user.clone().unwrap().connect_code, "TEST#001");
     }
 
