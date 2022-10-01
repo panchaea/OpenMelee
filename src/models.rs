@@ -12,7 +12,7 @@ use wana_kana::utils::{is_char_hiragana, is_char_katakana};
 
 const CONNECT_CODE_SEPARATOR: &str = "#";
 const CONNECT_CODE_MAX_LENGTH: usize = 8;
-const NAME_ENTRY_SELECTABLE_PUNCTUATION: &'static [&'static char] = &[
+const NAME_ENTRY_SELECTABLE_PUNCTUATION: &[&char] = &[
     &'+', &'-', &'=', &'!', &'?', &'@', &'%', &'&', &'#', &'$', &'.', &' ', &'｡', &'､',
 ];
 const OTHER_DISPLAYABLE_PUNCTUATION: &[&char] = &[&'/'];
