@@ -1,10 +1,12 @@
-{% macro input(name, label, errors=false, values=false, type="text", required="true") %}
+{% macro input(name, label, errors=false, values=false, type="text", required="true", autofocus="false") %}
   <div class="col">
     <label for="{{name}}">{{ label }}</label>
-    {% if values[name] %}
-      <input type="{{type}}" name="{{name}}" required="{{required}}" value="{{values[name]}}" aria-required="{{required}}" aria-invalid="{{name in errors}}" aria-describedby="{{name ~ '_error' }}">
+    {% if values[name] and errors and errors[name] %}
+      <input type="{{type}}" name="{{name}}" required="{{required}}" value="{{values[name]}}" aria-required="{{required}}" aria-invalid="{{true}}" aria-describedby="{{name ~ '_error' }}">
+    {% elif values[name] %}
+      <input type="{{type}}" name="{{name}}" required="{{required}}" value="{{values[name]}}" aria-required="{{required}}">
     {% else %}
-      <input type="{{type}}" name="{{name}}" required="{{required}}">
+      <input type="{{type}}" name="{{name}}" required="{{required}}" autofocus="{{autofocus}}" aria-required="{{required}}">
     {% endif %}
     {% if errors[name] %}
       {% for error in errors[name] %}
