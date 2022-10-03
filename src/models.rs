@@ -241,6 +241,38 @@ impl User {
             .hash_password(password.expose_secret().as_bytes(), &salt)
             .map(|hashed_password| hashed_password.to_string())
     }
+
+    pub async fn get_user_from_credentials<'a, T: SqliteExecutor<'a>>(
+        executor: T,
+        username: String,
+        password: SecretString,
+    ) -> Option<User> {
+        let user = sqlx::query("select * from users where username = $1")
+            .bind(username)
+            .fetch_one(executor)
+            .await;
+
+        if user.is_err() {
+            return None;
+        }
+
+        let password_hash = user.as_ref().unwrap().get::<String, &str>("password");
+        let password_hash_str = password_hash.as_str();
+        let parsed_hash = PasswordHash::new(password_hash_str);
+
+        if parsed_hash.is_err() {
+            return None;
+        }
+
+        if Argon2::default()
+            .verify_password(password.expose_secret().as_bytes(), &parsed_hash.unwrap())
+            .is_ok()
+        {
+            return User::from_row(&user.unwrap()).ok();
+        }
+
+        None
+    }
 }
 
 fn is_selectable_in_name_entry(s: &str) -> Result<(), ValidationError> {
@@ -541,5 +573,73 @@ mod test {
                 .get::<i64, usize>(0),
             1
         )
+    }
+
+    #[sqlx::test]
+    fn test_can_get_user_from_correct_credentials(pool: Pool<Sqlite>) {
+        User::create(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("password").unwrap(),
+            "test".to_string(),
+            "TEST#001".to_string(),
+        )
+        .await
+        .expect("Could not create user");
+
+        let user = User::get_user_from_credentials(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("password").unwrap(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(user.display_name, "test".to_string());
+        assert_eq!(user.connect_code, "TEST#001".to_string());
+    }
+
+    #[sqlx::test]
+    fn test_cannot_get_user_with_wrong_username(pool: Pool<Sqlite>) {
+        User::create(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("password").unwrap(),
+            "test".to_string(),
+            "TEST#001".to_string(),
+        )
+        .await
+        .expect("Could not create user");
+
+        let user = User::get_user_from_credentials(
+            &pool,
+            "test2".to_string(),
+            SecretString::from_str("password").unwrap(),
+        )
+        .await;
+
+        assert!(user.is_none());
+    }
+
+    #[sqlx::test]
+    fn test_cannot_get_user_with_wrong_password(pool: Pool<Sqlite>) {
+        User::create(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("password").unwrap(),
+            "test".to_string(),
+            "TEST#001".to_string(),
+        )
+        .await
+        .expect("Could not create user");
+
+        let user = User::get_user_from_credentials(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("hunter2").unwrap(),
+        )
+        .await;
+
+        assert!(user.is_none());
     }
 }
