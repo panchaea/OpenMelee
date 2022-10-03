@@ -1,0 +1,26 @@
+{% extends "base.html.tera" %}
+{% block title %}Profile{% endblock title %}
+{% block content %}
+{% include "navbar.html.tera" %}
+<h1>Profile</h1>
+<p>
+  Logged in as <strong>{{user.displayName}}</strong> (<samp>{{user.connectCode}}</samp>).
+</p>
+<hr/>
+<h3>Setup</h3>
+<ol>
+  <li>Download the <a href="#" target="_blank">custom Dolphin build</a> for your platform and your <a href="/slippi-re-user.json">user.json</a> file.</li>
+  <li>Run the custom Dolphin build and click <samp>Config > Slippi</samp>.</li>
+  <li>Enable <samp>Use custom matchmaking servers</samp> and set the following values in the boxes that appear:
+
+      <dl>
+        <dt><samp>Matchmaking host</samp></dt>
+        <dd>{{public_url}}</dd>
+        <dt><samp>User discovery URL</samp></dt>
+        <dd>{{public_url}}/user</dd>
+        <dt><samp>user.json file path</samp></dt>
+        <dd>Choose the user.json file downloaded in step 1.</dt>
+      </dl>
+  </li>
+</ol>
+{% endblock content %}

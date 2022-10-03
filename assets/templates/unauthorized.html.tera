@@ -1,0 +1,9 @@
+{% extends "base.html.tera" %}
+{% block title %}Unauthorized{% endblock title %}
+{% block content %}
+{% include "navbar.html.tera" %}
+<h1>Unauthorized</h1>
+<p>
+  You need to <a href="/login">log in</a> or <a href="/register">register</a> to access this page.
+</p>
+{% endblock content %}

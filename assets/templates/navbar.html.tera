@@ -2,7 +2,13 @@
   <ol>
     <li class="navbar-item"><a href="/">Home</a></li>
     <li class="navbar-spacer"></li>
-    <li class="navbar-item"><a href="/register">Register</a></li>
+    {% if logged_in %}
+      <li class="navbar-item"><a href="/profile">Profile</a></li>
+      <li class="navbar-item"><a href="/logout">Log out</a></li>
+    {% else %}
+      <li class="navbar-item"><a href="/register">Register</a></li>
+      <li class="navbar-item"><a href="/login">Log in</a></li>
+    {% endif %}
   </ol>
 </nav>
 <hr/>
