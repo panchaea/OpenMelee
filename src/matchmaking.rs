@@ -195,8 +195,8 @@ pub fn start_server(config: Config, _pool: SqlitePool) {
         .expect("Could not create ENet host");
 
     println!(
-        "Matchmaking server listening on udp://{}:{}",
-        config.matchmaking_server_address, config.matchmaking_port
+        "Matchmaking server listening on {}",
+        config.format_matchmaking_server_address(),
     );
 
     loop {

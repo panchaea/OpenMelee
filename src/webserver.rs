@@ -181,8 +181,8 @@ pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
     .serve(app(config.clone(), pool).await.into_make_service());
 
     println!(
-        "Web server listening on http://{}:{}",
-        config.webserver_address, config.webserver_port
+        "Web server listening on {}",
+        config.format_webserver_address(),
     );
 
     server.await.map_err(|_| ())

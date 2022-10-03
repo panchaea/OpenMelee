@@ -37,6 +37,19 @@ impl Default for Config {
     }
 }
 
+impl Config {
+    pub fn format_webserver_address(self) -> String {
+        format!("http://{}:{}", self.webserver_address, self.webserver_port)
+    }
+
+    pub fn format_matchmaking_server_address(self) -> String {
+        format!(
+            "udp://{}:{}",
+            self.matchmaking_server_address, self.matchmaking_port
+        )
+    }
+}
+
 #[derive(RustEmbed)]
 #[folder = "assets"]
 pub struct Asset;

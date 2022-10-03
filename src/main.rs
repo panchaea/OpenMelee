@@ -35,7 +35,7 @@ async fn main() {
                 tokio::spawn(webserver::start_server(config.clone(), pool.clone()));
 
             let enet_server_thread = tokio::task::spawn_blocking(move || {
-                matchmaking::start_server(config, pool);
+                matchmaking::start_server(config.clone(), pool);
             });
 
             if webserver_thread.await.is_err() {
