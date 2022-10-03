@@ -162,10 +162,7 @@ impl User {
         let tx_result = tx.commit().await;
 
         if tx_result.is_err() {
-            println!(
-                "Failed to create user: {}",
-                tx_result.unwrap_err().to_string()
-            );
+            println!("Failed to create user: {}", tx_result.unwrap_err());
         }
 
         result

@@ -168,7 +168,7 @@ async fn app(config: Config, pool: SqlitePool) -> Router {
         .fallback(get(not_found))
         .layer(axum_sqlx_tx::Layer::new(pool))
         .layer(Extension(slippi_re::TEMPLATES.clone()))
-        .layer(Extension(config.clone()))
+        .layer(Extension(config))
 }
 
 pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
