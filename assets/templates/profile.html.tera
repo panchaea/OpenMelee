@@ -15,7 +15,7 @@
 
       <dl>
         <dt><samp>Matchmaking host</samp></dt>
-        <dd>{{public_url}}</dd>
+        <dd>{{public_host}}</dd>
         <dt><samp>User discovery URL</samp></dt>
         <dd>{{public_url}}/user</dd>
         <dt><samp>user.json file path</samp></dt>
