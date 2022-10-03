@@ -4,10 +4,10 @@
 {% include "navbar.html.tera" %}
 <h1>slippi-re</h1>
 <h3>
-  An open source, self-hostable, Slippi compatible* Melee matchmaking server. <em>Currently in alpha</em>.
+  An <a href="#" target="_blank">open source</a>, self-hostable, Slippi compatible* Melee matchmaking server. <em>Currently in alpha</em>.
 </h3>
 <hr/>
 <p>
-  <small>*At the moment, a <a href="#">custom client</a> is required to play - the official client is hardcoded to use the Slippi servers, and there's no option to change this. We're working with the Slippi developers to try making this configurable.</small>
+  <small>*At the moment, a <a href="#" target="_blank">custom client</a> is required to play - the official client is hardcoded to use the Slippi servers, and there's no option to change this. We're working with the Slippi developers to try making this configurable.</small>
 </p>
 {% endblock content %}
