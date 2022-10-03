@@ -1,5 +1,5 @@
 {% extends "base.html.tera" %}
-{% block title %}slippi-re{% endblock title %}
+{% block title %}Not Found{% endblock title %}
 {% block content %}
 {% include "navbar.html.tera" %}
 <h1>Not Found</h1>
