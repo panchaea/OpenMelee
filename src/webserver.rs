@@ -158,32 +158,6 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     }
 }
 
-fn load_templates() -> Tera {
-    let templates = Asset::iter()
-        .into_iter()
-        .filter(|asset_path| asset_path.ends_with(".tera"))
-        .map(move |asset_path| {
-            let _asset_path = asset_path.clone();
-            let asset = Asset::get(&_asset_path).unwrap();
-            let contents = std::str::from_utf8(asset.data.as_ref()).unwrap();
-
-            (
-                std::path::Path::new(&asset_path.to_string())
-                    .file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-                contents.to_string(),
-            )
-        });
-
-    let mut tera = Tera::new("assets/templates/*.tera").expect("Failed to read templates");
-
-    tera.add_raw_templates(templates)
-        .expect("Failed to parse templates");
-
-    tera
 }
 
 async fn app(pool: SqlitePool) -> Router {
@@ -195,7 +169,7 @@ async fn app(pool: SqlitePool) -> Router {
         .route("/static/*file", static_handler.into_service())
         .fallback(get(not_found))
         .layer(axum_sqlx_tx::Layer::new(pool))
-        .layer(Extension(load_templates()))
+        .layer(Extension(slippi_re::TEMPLATES.clone()))
 }
 
 pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
@@ -286,7 +260,7 @@ mod test {
             .route("/static/*file", static_handler.into_service())
             .fallback(get(not_found))
             .layer(axum_sqlx_tx::Layer::new(pool))
-            .layer(Extension(load_templates()));
+            .layer(Extension(slippi_re::TEMPLATES.clone()));
 
         tokio::spawn(async move {
             axum::Server::from_tcp(listener)
@@ -404,7 +378,8 @@ mod test {
 
     #[test]
     fn can_render_index() {
-        let tera = load_templates();
-        assert!(tera.render("index.html.tera", &Context::new()).is_ok());
+        assert!(slippi_re::TEMPLATES
+            .render("index.html.tera", &Context::new())
+            .is_ok());
     }
 }

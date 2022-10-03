@@ -1,10 +1,12 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::str::FromStr;
 
+use once_cell::sync::Lazy;
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
+use tera::Tera;
 
 pub mod models;
 
@@ -38,6 +40,34 @@ impl Default for Config {
 #[derive(RustEmbed)]
 #[folder = "assets"]
 pub struct Asset;
+
+pub static TEMPLATES: Lazy<Tera> = Lazy::new(|| {
+    let templates = Asset::iter()
+        .into_iter()
+        .filter(|asset_path| asset_path.ends_with(".tera"))
+        .map(move |asset_path| {
+            let _asset_path = asset_path.clone();
+            let asset = Asset::get(&_asset_path).unwrap();
+            let contents = std::str::from_utf8(asset.data.as_ref()).unwrap();
+
+            (
+                std::path::Path::new(&asset_path.to_string())
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+                contents.to_string(),
+            )
+        });
+
+    let mut tera = Tera::new("assets/templates/*.tera").expect("Failed to read templates");
+
+    tera.add_raw_templates(templates)
+        .expect("Failed to parse templates");
+
+    tera
+});
 
 pub async fn init_pool(config: Config) -> SqlitePool {
     let connection_options = SqliteConnectOptions::from_str(&config.database_url.clone())
