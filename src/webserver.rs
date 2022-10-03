@@ -132,6 +132,7 @@ async fn register_form(
     .map(|_| Redirect::to("/"))
     .map_err(|errors| {
         let mut context = Context::new();
+        context.insert("error", &true);
         context.insert("field_errors", &errors.field_errors());
         context.insert("field_values", &PublicUserForm::from(&user_form));
         let content = tera.render("register.html.tera", &context).unwrap();

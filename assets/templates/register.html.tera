@@ -4,6 +4,9 @@
 {% include "navbar.html.tera" %}
 <h1>Register</h1>
 <form action="/register" method="post" enctype="application/x-www-form-urlencoded">
+  {% if error %}
+    <p class="error-block">Registration failed.</p>
+  {% endif %}
   <fieldset>
     <legend>Details</legend>
     <div class="row">

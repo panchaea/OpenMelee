@@ -3,6 +3,9 @@
     --bg: #110f15;
     --text: #dcdcdc;
     --accent: #698fe9;
+    --error-bg: #6a0c0c;
+    --error-border: #a61c1c;
+    --error: #ff6464;
 }
 
 html {
@@ -39,11 +42,21 @@ ol > .navbar-item:last-child {
     padding-right: 0px;
 }
 
+.error-block {
+    text-align: center;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    color: var(--error);
+    border-radius: 5px;
+    padding: 5px 0px;
+}
+
 .error {
     display: block;
     font-size-adjust: 0.4;
     margin-left: 2em;
-    white-space: pre;
+    white-space: pre-wrap;
+    color: var(--error);
 }
 
 .error::before {
