@@ -160,7 +160,7 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
 
 }
 
-async fn app(pool: SqlitePool) -> Router {
+async fn app(config: Config, pool: SqlitePool) -> Router {
     Router::new()
         .route("/", get(index))
         .route("/register", get(register))
@@ -170,6 +170,7 @@ async fn app(pool: SqlitePool) -> Router {
         .fallback(get(not_found))
         .layer(axum_sqlx_tx::Layer::new(pool))
         .layer(Extension(slippi_re::TEMPLATES.clone()))
+        .layer(Extension(config.clone()))
 }
 
 pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
@@ -177,7 +178,7 @@ pub async fn start_server(config: Config, pool: SqlitePool) -> Result<(), ()> {
         config.webserver_address,
         config.webserver_port,
     )))
-    .serve(app(pool).await.into_make_service());
+    .serve(app(config.clone(), pool).await.into_make_service());
 
     println!(
         "Web server listening on http://{}:{}",
