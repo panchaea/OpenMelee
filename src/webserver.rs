@@ -158,8 +158,6 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     }
 }
 
-}
-
 async fn app(config: Config, pool: SqlitePool) -> Router {
     Router::new()
         .route("/", get(index))
