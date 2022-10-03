@@ -1,6 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::str::FromStr;
 
+use figment::{providers::Env, providers::Serialized, Figment};
 use once_cell::sync::Lazy;
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
@@ -49,6 +50,13 @@ impl Config {
         )
     }
 }
+
+pub static CONFIG: Lazy<Config> = Lazy::new(|| {
+    Figment::from(Serialized::defaults(Config::default()))
+        .merge(Env::prefixed("SLIPPI_RE_"))
+        .extract()
+        .unwrap()
+});
 
 #[derive(RustEmbed)]
 #[folder = "assets"]

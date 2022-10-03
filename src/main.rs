@@ -1,10 +1,9 @@
 use clap::{Parser, Subcommand};
-use figment::{providers::Env, providers::Serialized, Figment};
 
 mod matchmaking;
 mod webserver;
 
-use slippi_re::{init_pool, run_migrations, Config};
+use slippi_re::{init_pool, run_migrations};
 
 #[derive(Parser)]
 #[clap()]
@@ -18,15 +17,12 @@ enum Commands {}
 
 #[tokio::main]
 async fn main() {
-    let config: Config = Figment::from(Serialized::defaults(Config::default()))
-        .merge(Env::prefixed("SLIPPI_RE_"))
-        .extract()
-        .unwrap();
-
     let cli = Cli::parse();
 
     match &cli.command {
         None => {
+            let config = slippi_re::CONFIG.clone();
+
             let pool = init_pool(config.clone()).await;
 
             run_migrations(&pool).await;
