@@ -15,6 +15,8 @@ use sqlx::{Acquire, FromRow, Row, Sqlite, SqliteExecutor};
 use validator::{Validate, ValidationError, ValidationErrors};
 use wana_kana::utils::{is_char_hiragana, is_char_katakana};
 
+use crate::Config;
+
 const CONNECT_CODE_SEPARATOR: &str = "#";
 const CONNECT_CODE_MAX_LENGTH: usize = 8;
 const NAME_ENTRY_SELECTABLE_PUNCTUATION: &[&char] = &[
@@ -270,6 +272,23 @@ impl User {
 
         None
     }
+
+    pub fn get_user_json(self, config: Config) -> UserJson {
+        UserJson {
+            user: self,
+            matchmaking_host: config.clone().format_matchmaking_host(),
+            user_discovery_url: config.clone().format_user_discovery_url(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserJson {
+    #[serde(flatten)]
+    user: User,
+    matchmaking_host: String,
+    user_discovery_url: String,
 }
 
 fn is_selectable_in_name_entry(s: &str) -> Result<(), ValidationError> {

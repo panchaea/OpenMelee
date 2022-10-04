@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
 use tera::Tera;
+use url::Url;
 
 pub mod models;
 
@@ -22,6 +23,7 @@ pub struct Config {
     pub matchmaking_max_peers: u64,
     pub database_url: String,
     pub database_max_connections: u32,
+    pub public_url: Option<Url>,
 }
 
 impl Default for Config {
@@ -34,6 +36,7 @@ impl Default for Config {
             matchmaking_max_peers: 1024,
             database_url: "slippi-re.sqlite".to_string(),
             database_max_connections: 10,
+            public_url: None,
         }
     }
 }
@@ -48,6 +51,23 @@ impl Config {
             "udp://{}:{}",
             self.matchmaking_server_address, self.matchmaking_port
         )
+    }
+
+    pub fn format_matchmaking_host(self) -> String {
+        self.clone()
+            .public_url
+            .and_then(|public_url| Some(public_url.host_str().unwrap().to_string()))
+            .unwrap_or("localhost".to_string())
+    }
+
+    pub fn format_user_discovery_url(self) -> String {
+        let url = self
+            .clone()
+            .public_url
+            .and_then(|public_url| Some(public_url.to_string()))
+            .unwrap_or(Config::format_webserver_address(self));
+
+        format!("{}/user", url)
     }
 }
 
