@@ -10,6 +10,7 @@ use sqlx::SqlitePool;
 use tera::Tera;
 use url::Url;
 
+pub mod auth;
 pub mod models;
 
 pub const LATEST_SLIPPI_CLIENT_VERSION: &str = "2.5.1";
@@ -24,6 +25,8 @@ pub struct Config {
     pub database_url: String,
     pub database_max_connections: u32,
     pub public_url: Option<Url>,
+    pub jwt_secret_path: Option<String>,
+    pub cookie_secret_path: Option<String>,
 }
 
 impl Default for Config {
@@ -37,6 +40,8 @@ impl Default for Config {
             database_url: "slippi-re.sqlite".to_string(),
             database_max_connections: 10,
             public_url: None,
+            jwt_secret_path: None,
+            cookie_secret_path: Some("slippi-re-cookie.key".to_string()),
         }
     }
 }
@@ -68,6 +73,10 @@ impl Config {
             .unwrap_or(Config::format_webserver_address(self));
 
         format!("{}/user", url)
+    }
+
+    pub fn can_set_secure_cookie(self) -> bool {
+        self.public_url.is_some() && self.public_url.unwrap().scheme() == "https"
     }
 }
 

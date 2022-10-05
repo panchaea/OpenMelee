@@ -23,6 +23,10 @@ async fn main() {
         None => {
             let config = slippi_re::CONFIG.clone();
 
+            if config.jwt_secret_path.is_none() {
+                panic!("JWT secret path not configured, exiting");
+            }
+
             let pool = init_pool(config.clone()).await;
 
             run_migrations(&pool).await;
