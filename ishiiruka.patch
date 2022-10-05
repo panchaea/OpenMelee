@@ -80,22 +80,24 @@ index 80a078972..6a6d9f18c 100644
  	int m_slippiNetplayPort;
  	bool m_slippiForceLanIp = false;
 diff --git a/Source/Core/Core/Slippi/SlippiMatchmaking.cpp b/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
-index 4728bb2e9..09cf7bdae 100644
+index 4728bb2e9..f2902430b 100644
 --- a/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
 +++ b/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
-@@ -34,7 +34,9 @@ SlippiMatchmaking::SlippiMatchmaking(SlippiUser *user)
+@@ -34,7 +34,11 @@ SlippiMatchmaking::SlippiMatchmaking(SlippiUser *user)
  	m_client = nullptr;
  	m_server = nullptr;
  
 -	MM_HOST = scm_slippi_semver_str.find("dev") == std::string::npos ? MM_HOST_PROD : MM_HOST_DEV;
-+	MM_HOST = SConfig::GetInstance().m_slippiForceCustomUserJson && !m_user->GetUserInfo().matchmakingHost.empty()
-+		? m_user->GetUserInfo().matchmakingHost
++	auto userInfo = m_user->GetUserInfo();
++
++	MM_HOST = SConfig::GetInstance().m_slippiForceCustomUserJson
++		? userInfo.matchmakingHost
 +		: scm_slippi_semver_str.find("dev") == std::string::npos ? MM_HOST_PROD : MM_HOST_DEV;
  
  	generator = std::default_random_engine(Common::Timer::GetTimeMs());
  }
 diff --git a/Source/Core/Core/Slippi/SlippiUser.cpp b/Source/Core/Core/Slippi/SlippiUser.cpp
-index c6e7da768..939584cbf 100644
+index c6e7da768..890c8ed31 100644
 --- a/Source/Core/Core/Slippi/SlippiUser.cpp
 +++ b/Source/Core/Core/Slippi/SlippiUser.cpp
 @@ -112,7 +112,7 @@ SlippiUser::~SlippiUser()
@@ -139,8 +141,8 @@ index c6e7da768..939584cbf 100644
  	// Generate URL. If this is a beta version, use the beta endpoint
 -	std::string url = URL_START;
 -	if (scm_slippi_semver_str.find("beta") != std::string::npos)
-+	std::string url = SConfig::GetInstance().m_slippiForceCustomUserJson && !userInfo.userDiscoveryUrl.empty()
-+		? userInfo.userDiscoveryUrl.c_str()
++	std::string url = SConfig::GetInstance().m_slippiForceCustomUserJson
++		? userInfo.userDiscoveryUrl
 +		: URL_START;
 +	if (
 +		url == URL_START &&
