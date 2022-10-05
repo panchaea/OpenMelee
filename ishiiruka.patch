@@ -80,36 +80,62 @@ index 80a078972..6a6d9f18c 100644
  	int m_slippiNetplayPort;
  	bool m_slippiForceLanIp = false;
 diff --git a/Source/Core/Core/Slippi/SlippiMatchmaking.cpp b/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
-index 4728bb2e9..f2902430b 100644
+index 4728bb2e9..89df09742 100644
 --- a/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
 +++ b/Source/Core/Core/Slippi/SlippiMatchmaking.cpp
-@@ -34,7 +34,11 @@ SlippiMatchmaking::SlippiMatchmaking(SlippiUser *user)
- 	m_client = nullptr;
- 	m_server = nullptr;
+@@ -250,7 +250,13 @@ void SlippiMatchmaking::startMatchmaking()
+ 	}
  
--	MM_HOST = scm_slippi_semver_str.find("dev") == std::string::npos ? MM_HOST_PROD : MM_HOST_DEV;
-+	auto userInfo = m_user->GetUserInfo();
-+
-+	MM_HOST = SConfig::GetInstance().m_slippiForceCustomUserJson
+ 	ENetAddress addr;
+-	enet_address_set_host(&addr, MM_HOST.c_str());
++	std::string mm_host = SConfig::GetInstance().m_slippiForceCustomUserJson
 +		? userInfo.matchmakingHost
-+		: scm_slippi_semver_str.find("dev") == std::string::npos ? MM_HOST_PROD : MM_HOST_DEV;
++		: MM_HOST;
++
++	ERROR_LOG(SLIPPI_ONLINE, "[Matchmaking] Connecting to mm server: %s...", mm_host.c_str());
++
++	enet_address_set_host(&addr, mm_host.c_str());
+ 	addr.port = MM_PORT;
  
- 	generator = std::default_random_engine(Common::Timer::GetTimeMs());
- }
+ 	m_server = enet_host_connect(m_client, &addr, 3, 0);
 diff --git a/Source/Core/Core/Slippi/SlippiUser.cpp b/Source/Core/Core/Slippi/SlippiUser.cpp
-index c6e7da768..890c8ed31 100644
+index c6e7da768..467ca1a5f 100644
 --- a/Source/Core/Core/Slippi/SlippiUser.cpp
 +++ b/Source/Core/Core/Slippi/SlippiUser.cpp
-@@ -112,7 +112,7 @@ SlippiUser::~SlippiUser()
+@@ -112,22 +112,24 @@ SlippiUser::~SlippiUser()
  
  bool SlippiUser::AttemptLogin()
  {
 -	std::string userFilePath = File::GetSlippiUserJSONPath();
 +	std::string userFilePath = File::GetSlippiUserJSONPath(SConfig::GetInstance());
  
++	if (!SConfig::GetInstance().m_slippiForceCustomUserJson) {
  // TODO: Remove a couple updates after ranked
  #ifndef __APPLE__
-@@ -158,7 +158,7 @@ void SlippiUser::OpenLogInPage()
+-	{
++		{
+ #ifdef _WIN32
+-		std::string oldUserFilePath = File::GetExeDirectory() + DIR_SEP + "user.json";
++			std::string oldUserFilePath = File::GetExeDirectory() + DIR_SEP + "user.json";
+ #else
+-		std::string oldUserFilePath = File::GetUserPath(D_USER_IDX) + DIR_SEP + "user.json";
++			std::string oldUserFilePath = File::GetUserPath(D_USER_IDX) + DIR_SEP + "user.json";
+ #endif
+-		if (File::Exists(oldUserFilePath) && !File::Rename(oldUserFilePath, userFilePath))
+-		{
+-			WARN_LOG(SLIPPI_ONLINE, "Could not move file %s to %s", oldUserFilePath.c_str(), userFilePath.c_str());
++			if (File::Exists(oldUserFilePath) && !File::Rename(oldUserFilePath, userFilePath))
++			{
++				WARN_LOG(SLIPPI_ONLINE, "Could not move file %s to %s", oldUserFilePath.c_str(), userFilePath.c_str());
++			}
+ 		}
+-	}
+ #endif
++	}
+ 
+ 	// Get user file
+ 	std::string userFileContents;
+@@ -158,7 +160,7 @@ void SlippiUser::OpenLogInPage()
  	cframe->OpenSlippiAuthenticationDialog();
  #else
  	std::string url = "https://slippi.gg/online/enable";
@@ -118,7 +144,7 @@ index c6e7da768..890c8ed31 100644
  
  #ifdef _WIN32
  	// On windows, sometimes the path can have backslashes and slashes mixed, convert all to backslashes
-@@ -274,13 +274,15 @@ SlippiUser::UserInfo SlippiUser::parseFile(std::string fileContents)
+@@ -274,13 +276,15 @@ SlippiUser::UserInfo SlippiUser::parseFile(std::string fileContents)
  	info.playKey = readString(res, "playKey");
  	info.connectCode = readString(res, "connectCode");
  	info.latestVersion = readString(res, "latestVersion");
@@ -135,7 +161,7 @@ index c6e7da768..890c8ed31 100644
  	File::Delete(userFilePath);
  }
  
-@@ -290,8 +292,13 @@ void SlippiUser::overwriteFromServer()
+@@ -290,8 +294,13 @@ void SlippiUser::overwriteFromServer()
  		return;
  
  	// Generate URL. If this is a beta version, use the beta endpoint
