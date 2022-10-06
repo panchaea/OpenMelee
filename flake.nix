@@ -1,5 +1,5 @@
 {
-  description = "slippi-re";
+  description = "openmelee";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -78,7 +78,7 @@
         };
       })) {
         overlays.default = final: _prev: {
-          slippi-re = self.packages.${final.stdenv.system}.default;
+          openmelee = self.packages.${final.stdenv.system}.default;
         };
 
         nixosModules.default = {

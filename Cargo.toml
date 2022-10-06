@@ -1,5 +1,5 @@
 [package]
-name = "slippi-re"
+name = "openmelee"
 version = "0.1.0"
 edition = "2021"
 
@@ -40,5 +40,5 @@ validator = { version = "0.16.0", features = [ "derive" ] }
 wana_kana = "2.1.0"
 
 [[bin]]
-name = "slippi-re"
+name = "openmelee"
 path = "src/main.rs"

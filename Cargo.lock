@@ -1369,6 +1369,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
+name = "openmelee"
+version = "0.1.0"
+dependencies = [
+ "argon2",
+ "async-trait",
+ "axum",
+ "axum-extra",
+ "axum-sqlx-tx",
+ "bson",
+ "chrono",
+ "clap 3.2.22",
+ "cookie",
+ "encoding_rs",
+ "enet",
+ "figment",
+ "hex",
+ "hyper",
+ "itertools 0.10.5",
+ "jsonwebtoken",
+ "mime_guess",
+ "once_cell",
+ "rand",
+ "reqwest",
+ "rust-embed",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "sqlx",
+ "tera",
+ "tokio",
+ "unicode-normalization",
+ "url",
+ "validator",
+ "wana_kana",
+]
+
+[[package]]
 name = "openssl"
 version = "0.10.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2089,44 +2127,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4614a76b2a8be0058caa9dbbaf66d988527d86d003c11a94fbd335d7661edcef"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "slippi-re"
-version = "0.1.0"
-dependencies = [
- "argon2",
- "async-trait",
- "axum",
- "axum-extra",
- "axum-sqlx-tx",
- "bson",
- "chrono",
- "clap 3.2.22",
- "cookie",
- "encoding_rs",
- "enet",
- "figment",
- "hex",
- "hyper",
- "itertools 0.10.5",
- "jsonwebtoken",
- "mime_guess",
- "once_cell",
- "rand",
- "reqwest",
- "rust-embed",
- "secrecy",
- "serde",
- "serde_json",
- "serde_repr",
- "sqlx",
- "tera",
- "tokio",
- "unicode-normalization",
- "url",
- "validator",
- "wana_kana",
 ]
 
 [[package]]

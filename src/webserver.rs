@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Sqlite, SqlitePool};
 use tera::{Context, Tera};
 
-use slippi_re::{auth::*, models::*, Asset, Config, LATEST_SLIPPI_CLIENT_VERSION};
+use openmelee::{auth::*, models::*, Asset, Config, LATEST_SLIPPI_CLIENT_VERSION};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -243,7 +243,7 @@ async fn get_user_json(
             (header::CONTENT_TYPE, "application/json; charset=utf-8"),
             (
                 header::CONTENT_DISPOSITION,
-                "attachment; filename=\"slippi-re-user.json\"",
+                "attachment; filename=\"openmelee-user.json\"",
             ),
         ]),
         Json(User::get_user_json(user, config)),
@@ -305,12 +305,12 @@ async fn app(config: Config, pool: SqlitePool) -> Router {
         .route("/login", post(login_form))
         .route("/logout", get(logout))
         .route("/profile", get(profile))
-        .route("/slippi-re-user.json", get(get_user_json))
+        .route("/openmelee-user.json", get(get_user_json))
         .route("/user/:uid", get(get_user))
         .route("/static/*file", static_handler.into_service())
         .fallback(get(not_found))
         .layer(axum_sqlx_tx::Layer::new(pool))
-        .layer(Extension(slippi_re::TEMPLATES.clone()))
+        .layer(Extension(openmelee::TEMPLATES.clone()))
         .layer(Extension(get_cookie_key(config.clone())))
         .layer(Extension(config.clone()))
 }
@@ -403,7 +403,7 @@ mod test {
             .route("/static/*file", static_handler.into_service())
             .fallback(get(not_found))
             .layer(axum_sqlx_tx::Layer::new(pool))
-            .layer(Extension(slippi_re::TEMPLATES.clone()));
+            .layer(Extension(openmelee::TEMPLATES.clone()));
 
         tokio::spawn(async move {
             axum::Server::from_tcp(listener)
@@ -521,7 +521,7 @@ mod test {
 
     #[test]
     fn can_render_index() {
-        assert!(slippi_re::TEMPLATES
+        assert!(openmelee::TEMPLATES
             .render("index.html.tera", &Context::new())
             .is_ok());
     }

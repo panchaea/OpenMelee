@@ -11,7 +11,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use sqlx::SqlitePool;
 use unicode_normalization::UnicodeNormalization;
 
-use slippi_re::{Config, LATEST_SLIPPI_CLIENT_VERSION};
+use openmelee::{Config, LATEST_SLIPPI_CLIENT_VERSION};
 
 const ENET_CHANNEL_ID: u8 = 0;
 

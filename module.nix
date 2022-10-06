@@ -1,43 +1,43 @@
 { config, lib, pkgs, ... }:
 
 let
-  cfg = config.services.slippi-re;
+  cfg = config.services.openmelee;
   inherit (lib) mkOption mkEnableOption mkIf types;
 in {
   options = {
-    services.slippi-re = {
-      enable = mkEnableOption "Whether to enable slippi-re.";
+    services.openmelee = {
+      enable = mkEnableOption "Whether to enable OpenMelee.";
 
       package = mkOption {
         type = types.package;
-        default = pkgs.slippi-re;
-        description = "slippi-re package to use";
+        default = pkgs.openmelee;
+        description = "OpenMelee package to use";
       };
 
       user = mkOption {
         type = types.str;
-        default = "slippi-re";
-        description = "User account under which slippi-re runs.";
+        default = "openmelee";
+        description = "User account under which OpenMelee runs.";
       };
 
       group = mkOption {
         type = types.str;
-        default = "slippi-re";
-        description = "Group account under which slippi-re runs.";
+        default = "openmelee";
+        description = "Group account under which OpenMelee runs.";
       };
 
       extraGroups = mkOption {
         type = types.listOf types.str;
         default = [ ];
         description =
-          "List of extra groups to which the 'slippi-re' user belongs.";
+          "List of extra groups to which the 'openmelee' user belongs.";
       };
 
       webserverListenAddr = mkOption {
         type = types.str;
         default = "127.0.0.1";
         example = "0.0.0.0";
-        description = "IP for the slippi-re web server to listen on.";
+        description = "IP for the OpenMelee web server to listen on.";
       };
 
       webserverListenPort = mkOption {
@@ -51,32 +51,40 @@ in {
         type = types.str;
         default = cfg.webserverListenAddr;
         example = "0.0.0.0";
-        description = "IP for the slippi-re matchmaking server to listen on.";
+        description = "IP for the OpenMelee matchmaking server to listen on.";
+      };
+
+      jwtSecretPath = mkOption {
+        type = types.str;
+        example = "/run/secrets/openmelee_jwt_secret";
+        description = ''
+          Path to a file containing the OpenMelee JWT secret.
+        '';
       };
 
       extraEnv = mkOption {
         type = types.attrsOf types.str;
         default = { };
-        example = { SLIPPI_RE_MATCHMAKING_MAX_PEERS = "2048"; };
-        description = "Extra environment variables for the slippi-re server.";
+        example = { OPENMELEE_MATCHMAKING_MAX_PEERS = "2048"; };
+        description = "Extra environment variables for the OpenMelee service.";
       };
 
       workDir = mkOption {
         type = types.str;
-        default = "/var/lib/slippi-re";
-        description = "Working directory for the slippi-re service.";
+        default = "/var/lib/openmelee";
+        description = "Working directory for the OpenMelee service.";
       };
     };
   };
 
   config = mkIf cfg.enable {
-    environment.systemPackages = [ pkgs.slippi-re ];
+    environment.systemPackages = [ pkgs.openmelee ];
 
-    ids.gids.slippi-re = 469;
-    ids.uids.slippi-re = 469;
+    ids.gids.openmelee = 470;
+    ids.uids.openmelee = 470;
 
     users.users.${cfg.user} = {
-      uid = config.ids.uids.slippi-re;
+      uid = config.ids.uids.openmelee;
       group = cfg.group;
       extraGroups = cfg.extraGroups;
       home = cfg.workDir;
@@ -84,22 +92,23 @@ in {
       useDefaultShell = true;
     };
 
-    users.groups.${cfg.group}.gid = config.ids.gids.slippi-re;
+    users.groups.${cfg.group}.gid = config.ids.gids.openmelee;
 
-    systemd.services.slippi-re = {
-      description = "slippi-re matchmaking server";
+    systemd.services.openmelee = {
+      description = "OpenMelee matchmaking server";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
       environment = {
-        SLIPPI_RE_WEBSERVER_ADDRESS = cfg.webserverListenAddr;
-        SLIPPI_RE_WEBSERVER_PORT = builtins.toString cfg.webserverListenPort;
-        SLIPPI_RE_MATCHMAKING_SERVER_ADDRESS = cfg.matchmakingServerListenAddr;
-        SLIPPI_RE_DATABASE_URL = "${cfg.workDir}/slippi-re.sqlite";
+        OPENMELEE_WEBSERVER_ADDRESS = cfg.webserverListenAddr;
+        OPENMELEE_WEBSERVER_PORT = builtins.toString cfg.webserverListenPort;
+        OPENMELEE_MATCHMAKING_SERVER_ADDRESS = cfg.matchmakingServerListenAddr;
+        OPENMELEE_DATABASE_URL = "${cfg.workDir}/openmelee.sqlite";
+        OPENMELEE_JWT_SECRET_PATH = cfg.jwtSecretPath;
       } // cfg.extraEnv;
 
       serviceConfig = {
         User = cfg.user;
-        ExecStart = "${cfg.package}/bin/slippi-re";
+        ExecStart = "${cfg.package}/bin/openmelee";
         Restart = "always";
         WorkingDirectory = cfg.workDir;
       };

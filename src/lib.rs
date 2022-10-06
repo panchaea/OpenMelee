@@ -37,11 +37,11 @@ impl Default for Config {
             matchmaking_server_address: Ipv4Addr::LOCALHOST,
             matchmaking_port: 43113,
             matchmaking_max_peers: 1024,
-            database_url: "slippi-re.sqlite".to_string(),
+            database_url: "openmelee.sqlite".to_string(),
             database_max_connections: 10,
             public_url: None,
             jwt_secret_path: None,
-            cookie_secret_path: Some("slippi-re-cookie.key".to_string()),
+            cookie_secret_path: Some("openmelee-cookie.key".to_string()),
         }
     }
 }
@@ -82,7 +82,7 @@ impl Config {
 
 pub static CONFIG: Lazy<Config> = Lazy::new(|| {
     Figment::from(Serialized::defaults(Config::default()))
-        .merge(Env::prefixed("SLIPPI_RE_"))
+        .merge(Env::prefixed("OPENMELEE_"))
         .extract()
         .unwrap()
 });

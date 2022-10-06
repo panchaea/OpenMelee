@@ -9,7 +9,7 @@
 <hr/>
 <h3>Getting started</h3>
 <ol>
-  <li>Download the <a href="#" target="_blank">Dolphin emulator build</a> for your platform and your <a href="/slippi-re-user.json">user.json</a> file.</li>
+  <li>Download the <a href="#" target="_blank">Dolphin emulator build</a> for your platform and your <a href="/openmelee-user.json">user.json</a> file.</li>
   <li>Run Dolphin and click <samp>Config</samp> in the top bar, then click the <samp>Slippi</samp> tab in the window that appears.</li>
   <li>Enable <samp>Use custom user.json</samp>. In the file picker that appears, select the file downloaded in step 1.
   </li>

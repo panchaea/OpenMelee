@@ -3,7 +3,7 @@ use clap::{Parser, Subcommand};
 mod matchmaking;
 mod webserver;
 
-use slippi_re::{init_pool, run_migrations};
+use openmelee::{init_pool, run_migrations};
 
 #[derive(Parser)]
 #[clap()]
@@ -21,7 +21,7 @@ async fn main() {
 
     match &cli.command {
         None => {
-            let config = slippi_re::CONFIG.clone();
+            let config = openmelee::CONFIG.clone();
 
             if config.jwt_secret_path.is_none() {
                 panic!("JWT secret path not configured, exiting");

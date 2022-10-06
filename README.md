@@ -1,4 +1,4 @@
-# slippi-re
+# OpenMelee
 
 Open-source reimplementation of the Slippi matchmaking server.
 
@@ -9,16 +9,16 @@ https://github.com/project-slippi/Ishiiruka/issues/191
 ## Building this project
 
 ``` sh
-$ cd slippi-re
+$ cd openmelee
 $ cargo build --release
-$ ./target/release/slippi-re
+$ ./target/release/openmelee
 ```
 
 or, with [Nix](https://nixos.org/):
 
 ```sh
 $ nix build
-$ ./result/bin/slippi-re
+$ ./result/bin/openmelee
 ```
 
 ## Testing
