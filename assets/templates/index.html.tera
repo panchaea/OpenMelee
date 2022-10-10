@@ -4,7 +4,7 @@
 {% include "navbar.html.tera" %}
 <h1>OpenMelee</h1>
 <h3>
-  An <a href="#" target="_blank">open source</a>, self-hostable, Slippi compatible* Melee matchmaking server. <em>Currently in alpha</em>.
+  An <a href="https://github.com/panchaea/openmelee" target="_blank">open source</a>, self-hostable, Slippi compatible* Melee matchmaking server. <em>Currently in alpha</em>.
 </h3>
 <hr/>
 <p>
