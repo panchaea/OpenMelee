@@ -148,14 +148,20 @@ mod test {
     fn test_format_user_discovery_url_without_public_url() {
         let mut config = Config::default();
         config.webserver_port = 5001;
-        assert_eq!(config.format_user_discovery_url(), "http://127.0.0.1:5001/user");
+        assert_eq!(
+            config.format_user_discovery_url(),
+            "http://127.0.0.1:5001/user"
+        );
     }
 
     #[test]
     fn test_format_user_discovery_url_with_public_url() {
         let mut config = Config::default();
         config.public_url = Some(Url::try_from("https://example.org").unwrap());
-        assert_eq!(config.format_user_discovery_url(), "https://example.org/user");
+        assert_eq!(
+            config.format_user_discovery_url(),
+            "https://example.org/user"
+        );
     }
 
     #[test]
