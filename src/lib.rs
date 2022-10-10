@@ -48,7 +48,7 @@ impl Default for Config {
 
 impl Config {
     pub fn format_webserver_address(self) -> String {
-        format!("http://{}:{}", self.webserver_address, self.webserver_port)
+        format!("http://{}:{}/", self.webserver_address, self.webserver_port)
     }
 
     pub fn format_matchmaking_server_address(self) -> String {
@@ -72,7 +72,7 @@ impl Config {
             .and_then(|public_url| Some(public_url.to_string()))
             .unwrap_or(Config::format_webserver_address(self));
 
-        format!("{}/user", url)
+        format!("{}user", url)
     }
 
     pub fn can_set_secure_cookie(self) -> bool {
@@ -135,5 +135,39 @@ pub async fn run_migrations(pool: &SqlitePool) {
     match sqlx::migrate!().run(pool).await {
         Ok(_) => (),
         _ => panic!("Failed to run migrations, exiting."),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use url::Url;
+
+    use crate::Config;
+
+    #[test]
+    fn test_format_user_discovery_url_without_public_url() {
+        let mut config = Config::default();
+        config.webserver_port = 5001;
+        assert_eq!(config.format_user_discovery_url(), "http://127.0.0.1:5001/user");
+    }
+
+    #[test]
+    fn test_format_user_discovery_url_with_public_url() {
+        let mut config = Config::default();
+        config.public_url = Some(Url::try_from("https://example.org").unwrap());
+        assert_eq!(config.format_user_discovery_url(), "https://example.org/user");
+    }
+
+    #[test]
+    fn test_format_matchmaking_host_without_public_url() {
+        let config = Config::default();
+        assert_eq!(config.format_matchmaking_host(), "localhost");
+    }
+
+    #[test]
+    fn test_format_matchmaking_host_with_public_url() {
+        let mut config = Config::default();
+        config.public_url = Some(Url::try_from("https://example.org").unwrap());
+        assert_eq!(config.format_matchmaking_host(), "example.org");
     }
 }
