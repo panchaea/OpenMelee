@@ -13,10 +13,21 @@ html {
 }
 
 .container {
-    max-width: 800px;
-    min-width: 800px;
     margin: 0 auto;
     padding: 20px 10px;
+}
+
+@media (max-width: 800px) {
+    .container {
+        min-width: 100%;
+    }
+}
+
+@media (min-width: 800px) {
+    .container {
+        max-width: 800px;
+        min-width: 800px;
+    }
 }
 
 .navbar > ol {
