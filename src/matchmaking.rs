@@ -105,11 +105,17 @@ enum MatchmakingMessage {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+struct PeerData {
+    ticket: CreateTicket,
+    joined_at: i64,
+}
+
 pub fn start_server(config: Config, _pool: SqlitePool) {
     let enet = Enet::new().expect("Could not initialize ENet");
     let listen_address = Address::new(config.matchmaking_server_address, config.matchmaking_port);
     let mut host = enet
-        .create_host::<CreateTicket>(
+        .create_host::<PeerData>(
             Some(&listen_address),
             config.matchmaking_max_peers,
             ChannelLimit::Maximum,
@@ -133,7 +139,8 @@ pub fn start_server(config: Config, _pool: SqlitePool) {
             .filter(|peer| peer.state() == PeerState::Connected)
             .filter(|peer| peer.data().is_some());
 
-        let peers_by_game_mode = connected_peers.group_by(|peer| peer.data().unwrap().search.mode);
+        let peers_by_game_mode =
+            connected_peers.group_by(|peer| peer.data().unwrap().ticket.search.mode);
 
         peers_by_game_mode.into_iter().for_each(|(mode, peers)| {
             handle_matchmaking(mode, peers.collect_vec());
@@ -141,7 +148,7 @@ pub fn start_server(config: Config, _pool: SqlitePool) {
     }
 }
 
-fn handle_enet_event(mut event: Event<CreateTicket>) {
+fn handle_enet_event(mut event: Event<PeerData>) {
     match event {
         Event::Connect(_) => println!("New connection!"),
         Event::Disconnect(..) => println!("Disconnect!"),
@@ -155,7 +162,10 @@ fn handle_enet_event(mut event: Event<CreateTicket>) {
 
             println!("{:?}", packet_data);
 
-            sender.set_data(Some(message.clone()));
+            sender.set_data(Some(PeerData {
+                ticket: message.clone(),
+                joined_at: Utc::now().timestamp(),
+            }));
 
             match message.search.mode {
                 OnlinePlayMode::Direct => {
@@ -183,14 +193,14 @@ fn handle_enet_event(mut event: Event<CreateTicket>) {
     }
 }
 
-fn handle_matchmaking(mode: OnlinePlayMode, peers: Vec<Peer<CreateTicket>>) {
-    let mut matched_peers: Vec<Vec<Peer<CreateTicket>>> = vec![];
+fn handle_matchmaking(mode: OnlinePlayMode, peers: Vec<Peer<PeerData>>) {
+    let mut matched_peers: Vec<Vec<Peer<PeerData>>> = vec![];
 
     if mode == OnlinePlayMode::Direct {
         peers
             .iter()
             .group_by(|peer| {
-                let CreateTicket { user, search, .. } = peer.data().unwrap();
+                let CreateTicket { user, search, .. } = &peer.data().unwrap().ticket;
                 vec![
                     user.connect_code.clone(),
                     search.connect_code.clone().unwrap(),
@@ -212,7 +222,7 @@ fn handle_matchmaking(mode: OnlinePlayMode, peers: Vec<Peer<CreateTicket>>) {
             _peers
                 .clone()
                 .iter()
-                .map(|peer| (peer.data().unwrap().clone(), peer.address()))
+                .map(|peer| (peer.data().unwrap().ticket.clone(), peer.address()))
                 .collect(),
             mode,
         );
