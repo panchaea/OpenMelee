@@ -4,7 +4,7 @@ use chrono::Utc;
 use encoding_rs::SHIFT_JIS;
 use enet::*;
 use itertools::Itertools;
-use rand::{seq::IteratorRandom, seq::SliceRandom, thread_rng};
+use rand::{seq::SliceRandom, thread_rng};
 use serde::{de, Deserialize, Serialize};
 use sqlx::SqlitePool;
 use unicode_normalization::UnicodeNormalization;
@@ -194,6 +194,7 @@ fn handle_enet_event(mut event: Event<PeerData>) {
 }
 
 fn handle_matchmaking(mode: OnlinePlayMode, peers: Vec<Peer<PeerData>>) {
+    let mut rng = thread_rng();
     let mut matched_peers: Vec<Vec<Peer<PeerData>>> = vec![];
 
     if mode == OnlinePlayMode::Direct {
@@ -240,22 +241,29 @@ fn handle_matchmaking(mode: OnlinePlayMode, peers: Vec<Peer<PeerData>>) {
     }
 
     matched_peers.iter().for_each(|_peers| {
+        let mut randomized_peers = _peers.iter().cloned().collect_vec();
+        randomized_peers.shuffle(&mut rng);
+
         let messages = create_game(
-            _peers
+            randomized_peers
                 .clone()
                 .iter()
                 .map(|peer| (peer.data().unwrap().ticket.clone(), peer.address()))
                 .collect(),
             mode,
         );
-        _peers
-            .clone()
+
+        randomized_peers
             .iter()
             .zip(messages)
             .map(|(_peer, message)| {
                 let peer = &mut _peer.clone();
                 let message_str = &serde_json::to_string(&message).unwrap();
-                println!("Sending message: \n{:?}", message_str,);
+                println!(
+                    "Sending message to {:?}: \n{:?}",
+                    peer.data().unwrap().ticket.user.connect_code,
+                    message_str,
+                );
                 peer.send_packet(
                     Packet::new(
                         &message_str.clone().into_bytes(),
@@ -279,15 +287,9 @@ fn create_game(
     _players: Vec<(CreateTicket, Address)>,
     mode: OnlinePlayMode,
 ) -> Vec<MatchmakingMessage> {
-    let mut rng = thread_rng();
     let match_id = get_match_id(mode);
     let stages = Stage::get_allowed_stages(mode);
     let ports = ControllerPort::get_ports(mode);
-    let randomized_ports: Vec<ControllerPort> = ports
-        .choose_multiple(&mut rng, _players.len())
-        .cloned()
-        .collect();
-    let host_port = ports.iter().choose(&mut rng);
 
     _players
         .iter()
@@ -295,7 +297,7 @@ fn create_game(
         .map(|(i, _)| MatchmakingMessage::GetTicketResponse {
             latest_version: LATEST_SLIPPI_CLIENT_VERSION.to_string(),
             match_id: match_id.clone(),
-            is_host: *ports.get(i).unwrap() == *host_port.unwrap(),
+            is_host: i == 0,
             is_assigned: true,
             players: _players
                 .clone()
@@ -306,7 +308,7 @@ fn create_game(
                         _ticket.clone(),
                         _address.clone(),
                         i == j,
-                        *randomized_ports.get(j).unwrap(),
+                        *ports.get(j).unwrap(),
                     )
                 })
                 .collect(),
