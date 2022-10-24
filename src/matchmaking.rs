@@ -168,7 +168,7 @@ fn handle_enet_event(mut event: Event<PeerData>) {
             }));
 
             match message.search.mode {
-                OnlinePlayMode::Direct => {
+                OnlinePlayMode::Direct | OnlinePlayMode::Unranked => {
                     sender
                         .send_packet(
                             Packet::new(
@@ -213,6 +213,28 @@ fn handle_matchmaking(mode: OnlinePlayMode, peers: Vec<Peer<PeerData>>) {
                 let peer_vec = peer_group.collect_vec();
                 if peer_vec.len() > 1 {
                     matched_peers.push(peer_vec.clone().into_iter().cloned().collect_vec());
+                }
+            });
+    }
+
+    if mode == OnlinePlayMode::Unranked {
+        peers
+            .iter()
+            .sorted_by(|peer_a, peer_b| {
+                peer_b
+                    .data()
+                    .unwrap()
+                    .joined_at
+                    .partial_cmp(&peer_a.data().unwrap().joined_at)
+                    .unwrap()
+            })
+            .into_iter()
+            .chunks(2)
+            .into_iter()
+            .for_each(|peer_chunk| {
+                let peer_vec = peer_chunk.cloned().collect_vec();
+                if peer_vec.len() > 1 {
+                    matched_peers.push(peer_vec);
                 }
             });
     }
