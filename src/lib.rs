@@ -11,6 +11,7 @@ use tera::Tera;
 use url::Url;
 
 pub mod auth;
+pub mod game;
 pub mod models;
 
 pub const LATEST_SLIPPI_CLIENT_VERSION: &str = "2.5.1";

@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fmt;
 
 use chrono::Utc;
 use encoding_rs::SHIFT_JIS;
@@ -7,11 +6,10 @@ use enet::*;
 use itertools::Itertools;
 use rand::{seq::IteratorRandom, seq::SliceRandom, thread_rng};
 use serde::{de, Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 use sqlx::SqlitePool;
 use unicode_normalization::UnicodeNormalization;
 
-use openmelee::{Config, LATEST_SLIPPI_CLIENT_VERSION};
+use openmelee::{game::*, Config, LATEST_SLIPPI_CLIENT_VERSION};
 
 const ENET_CHANNEL_ID: u8 = 0;
 
@@ -78,80 +76,6 @@ impl Player {
             ip_address_lan,
             is_local_player,
             port,
-        }
-    }
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone, Deserialize_repr, Serialize_repr)]
-#[repr(u8)]
-enum ControllerPort {
-    One = 1,
-    Two = 2,
-    Three = 3,
-    Four = 4,
-}
-
-impl ControllerPort {
-    fn get_ports(mode: OnlinePlayMode) -> Vec<ControllerPort> {
-        match mode {
-            OnlinePlayMode::Teams => vec![
-                ControllerPort::One,
-                ControllerPort::Two,
-                ControllerPort::Three,
-                ControllerPort::Four,
-            ],
-            _ => vec![ControllerPort::One, ControllerPort::Two],
-        }
-    }
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone, Deserialize_repr, Serialize_repr)]
-#[repr(u8)]
-enum OnlinePlayMode {
-    Ranked = 0,
-    Unranked = 1,
-    Direct = 2,
-    Teams = 3,
-}
-
-impl fmt::Display for OnlinePlayMode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let string = match &self {
-            OnlinePlayMode::Ranked => "ranked",
-            OnlinePlayMode::Unranked => "unranked",
-            OnlinePlayMode::Direct => "direct",
-            OnlinePlayMode::Teams => "teams",
-        };
-        write!(f, "{}", string)
-    }
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone, Deserialize_repr, Serialize_repr)]
-#[repr(u8)]
-enum Stage {
-    FountainOfDreams = 0x2,
-    PokemonStadium = 0x3,
-    YoshisStory = 0x8,
-    DreamLand = 0x1C,
-    Battlefield = 0x1F,
-    FinalDestination = 0x20,
-}
-
-impl Stage {
-    fn get_allowed_stages(mode: OnlinePlayMode) -> Vec<Stage> {
-        let mut allowed_stages = vec![
-            Stage::PokemonStadium,
-            Stage::YoshisStory,
-            Stage::DreamLand,
-            Stage::Battlefield,
-            Stage::FinalDestination,
-        ];
-        match mode {
-            OnlinePlayMode::Teams => allowed_stages,
-            _ => {
-                allowed_stages.push(Stage::FountainOfDreams);
-                allowed_stages
-            }
         }
     }
 }
