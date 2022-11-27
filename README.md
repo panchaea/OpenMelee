@@ -11,14 +11,15 @@ https://github.com/project-slippi/Ishiiruka/issues/191
 ``` sh
 $ cd openmelee
 $ cargo build --release
-$ ./target/release/openmelee
+$ OPENMELEE_JWT_SECRET_PATH=/path/to/file ./target/release/openmelee
 ```
 
 or, with [Nix](https://nixos.org/):
 
 ```sh
+$ cd openmelee
 $ nix build
-$ ./result/bin/openmelee
+$ OPENMELEE_JWT_SECRET_PATH=/path/to/file ./result/bin/openmelee
 ```
 
 ## Testing
