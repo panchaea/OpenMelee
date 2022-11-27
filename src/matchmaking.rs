@@ -9,7 +9,7 @@ use serde::{de, Deserialize, Serialize};
 use sqlx::SqlitePool;
 use unicode_normalization::UnicodeNormalization;
 
-use openmelee::{game::*, Config, LATEST_SLIPPI_CLIENT_VERSION};
+use openmelee::{game::*, models, Config, LATEST_SLIPPI_CLIENT_VERSION};
 
 const ENET_CHANNEL_ID: u8 = 0;
 
@@ -111,7 +111,7 @@ struct PeerData {
     joined_at: i64,
 }
 
-pub fn start_server(config: Config, _pool: SqlitePool) {
+pub fn start_server(config: Config, pool: SqlitePool) {
     let enet = Enet::new().expect("Could not initialize ENet");
     let listen_address = Address::new(config.matchmaking_server_address, config.matchmaking_port);
     let mut host = enet
@@ -132,7 +132,7 @@ pub fn start_server(config: Config, _pool: SqlitePool) {
     loop {
         host.service(1000)
             .expect("ENet service failed")
-            .map(handle_enet_event);
+            .map(|event| handle_enet_event(event, pool.clone()));
 
         let connected_peers = host
             .peers()
@@ -148,7 +148,7 @@ pub fn start_server(config: Config, _pool: SqlitePool) {
     }
 }
 
-fn handle_enet_event(mut event: Event<PeerData>) {
+async fn handle_enet_event(mut event: Event<'_, PeerData>, pool: SqlitePool) {
     match event {
         Event::Connect(_) => println!("New connection!"),
         Event::Disconnect(..) => println!("Disconnect!"),
@@ -167,26 +167,34 @@ fn handle_enet_event(mut event: Event<PeerData>) {
                 joined_at: Utc::now().timestamp(),
             }));
 
-            match message.search.mode {
-                OnlinePlayMode::Direct | OnlinePlayMode::Unranked => {
-                    sender
-                        .send_packet(
-                            Packet::new(
-                                &serde_json::to_string(
-                                    &MatchmakingMessage::CreateTicketResponse {},
+            if !models::User::check_play_key(&pool, message.user.uid, message.user.play_key).await {
+                println!(
+                    "User {:?} failed play_key validation",
+                    message.user.connect_code
+                );
+                sender.disconnect_later(0);
+            } else {
+                match message.search.mode {
+                    OnlinePlayMode::Direct | OnlinePlayMode::Unranked => {
+                        sender
+                            .send_packet(
+                                Packet::new(
+                                    &serde_json::to_string(
+                                        &MatchmakingMessage::CreateTicketResponse {},
+                                    )
+                                    .unwrap()
+                                    .into_bytes(),
+                                    PacketMode::ReliableSequenced,
                                 )
-                                .unwrap()
-                                .into_bytes(),
-                                PacketMode::ReliableSequenced,
+                                .unwrap(),
+                                ENET_CHANNEL_ID,
                             )
-                            .unwrap(),
-                            ENET_CHANNEL_ID,
-                        )
-                        .unwrap();
-                }
-                _ => {
-                    println!("Play mode {:?} not implemented", message.search.mode);
-                    sender.disconnect_later(0);
+                            .unwrap();
+                    }
+                    _ => {
+                        println!("Play mode {:?} not implemented", message.search.mode);
+                        sender.disconnect_later(0);
+                    }
                 }
             }
         }

@@ -113,6 +113,19 @@ impl User {
             .await
     }
 
+    pub async fn check_play_key<'a, T: SqliteExecutor<'a>>(
+        executor: T,
+        uid: String,
+        play_key: String,
+    ) -> bool {
+        sqlx::query_as::<_, User>("select * from users where uid = $1 and play_key = $2")
+            .bind(uid)
+            .bind(play_key)
+            .fetch_one(executor)
+            .await
+            .is_ok()
+    }
+
     pub async fn check_constraints_and_create(
         mut tx: Tx<Sqlite>,
         username: String,
@@ -657,5 +670,21 @@ mod test {
         .await;
 
         assert!(user.is_none());
+    }
+
+    #[sqlx::test]
+    fn test_check_play_key(pool: Pool<Sqlite>) {
+        let user = User::create(
+            &pool,
+            "test".to_string(),
+            SecretString::from_str("password").unwrap(),
+            "test".to_string(),
+            "TEST#001".to_string(),
+        )
+        .await
+        .expect("Could not create user");
+
+        assert!(!User::check_play_key(&pool, user.uid.clone(), "foo".to_string()).await);
+        assert!(User::check_play_key(&pool, user.uid.clone(), user.play_key).await);
     }
 }
